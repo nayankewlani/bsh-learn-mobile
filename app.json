@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "BSHLearn",
+    "slug": "bsh-learn",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "bshlearn",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0914"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bshlearn.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0914"
+      },
+      "package": "com.bshlearn.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3f5623c8-423c-43ce-9d72-b5fd322b7f07"
+      }
+    }
+  }
+}
