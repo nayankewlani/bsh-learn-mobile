@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, Image } from "react-native";
 import { router } from "expo-router";
 import { useCourseStore, Course } from "../../stores/courseStore";
 import { useAuthStore } from "../../stores/authStore";
@@ -21,9 +21,10 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
+        <Image source={require("../../assets/logo-1.png")} style={styles.heroLogo} resizeMode="contain" />
         <Text style={styles.greeting}>👋 {user ? `Hello, ${user.name.split(" ")[0]}!` : "Welcome to BSHLearn"}</Text>
-        <Text style={styles.heroTitle}>India's Best{"\n"}Learning Platform</Text>
-        <Text style={styles.heroSub}>Live classes, recorded courses & quizzes</Text>
+        <Text style={styles.heroTitle}>India's Best{"\n"}Spiritual Learning</Text>
+        <Text style={styles.heroSub}>Hypnosis · Reiki · Shadow Work · Akashik</Text>
         <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push("/(tabs)/explore")}>
           <Text style={styles.ctaBtnText}>Explore Courses →</Text>
         </TouchableOpacity>
@@ -69,7 +70,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  hero: { backgroundColor: COLORS.surface, padding: 24, paddingTop: 40 },
+  hero: { backgroundColor: COLORS.surface, padding: 24, paddingTop: 40, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  heroLogo: { width: 140, height: 52, marginBottom: 12 },
   greeting: { color: COLORS.primaryLight, fontSize: 14, marginBottom: 8 },
   heroTitle: { fontSize: 30, fontWeight: "900", color: COLORS.text, lineHeight: 36, marginBottom: 8 },
   heroSub: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
