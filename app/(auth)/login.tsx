@@ -59,6 +59,14 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Remember me + Forgot Password row */}
+        <View style={styles.actionsRow}>
+          <Text style={styles.mutedText}>Remember me</Text>
+          <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
+            <Text style={styles.forgotLink}>Forgot Password?</Text>
+          </TouchableOpacity>
+        </View>
+
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>⚠️ {error}</Text>
@@ -90,6 +98,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: COLORS.surface2, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12, color: COLORS.text, padding: 13, fontSize: 15, marginBottom: 16 },
   passRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },
   eyeBtn: { paddingHorizontal: 12, paddingVertical: 13 },
+  actionsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  forgotLink: { color: COLORS.primaryLight, fontWeight: "600", fontSize: 13 },
   btn: { backgroundColor: COLORS.primary, borderRadius: 14, padding: 15, alignItems: "center", marginTop: 8 },
   btnText: { color: "#fff", fontWeight: "800", fontSize: 16 },
   errorBox: { backgroundColor: "#450a0a", borderRadius: 10, padding: 10, marginBottom: 12 },
