@@ -1,7 +1,7 @@
 // Android emulator: "http://10.0.2.2:8000/api"
 // iOS simulator: "http://localhost:8000/api"
 // Physical device: use your machine's LAN IP (run: ipconfig | findstr IPv4)
-export const API_URL = "https://13.60.205.210.nip.io/api";
+export const API_URL = "https://bshhealers.com/api";
 
 // Razorpay public key (safe to expose in client — secret stays on server)
 export const RAZORPAY_KEY_ID = "rzp_live_SQGufG3o2bQE0c";
