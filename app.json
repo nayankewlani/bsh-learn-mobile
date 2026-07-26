@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "BSHLearn",
+    "name": "BSH Healers",
     "slug": "bsh-learn",
-    "version": "2.0.0",
+    "version": "2.6.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -14,14 +14,29 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bshlearn.app"
+      "bundleIdentifier": "com.bshlearn.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "BSH Healers needs camera access so you can join live video classes.",
+        "NSMicrophoneUsageDescription": "BSH Healers needs microphone access so you can speak in live video classes."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0914"
       },
-      "package": "com.bshlearn.app"
+      "package": "com.bshlearn.app",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -29,7 +44,16 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7c3aed",
+          "sounds": [],
+          "mode": "production"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
