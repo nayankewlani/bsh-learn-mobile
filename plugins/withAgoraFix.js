@@ -1,47 +1,75 @@
 /**
  * Expo config plugin: removes the standalone buildscript block from
- * react-native-agora's android/build.gradle.
+ * react-native-agora's android/build.gradle before Gradle runs.
  *
  * That block declares AGP 7.2.1 as a classpath dependency, which crashes
- * at Gradle configuration time when EAS uses AGP 8.x. The block is not
- * needed when agora is a library dependency (only needed when it is the
- * root project), so removing it is safe.
- *
- * This runs during expo prebuild (before Gradle), so it is more reliable
- * than patch-package (which can be skipped or fail silently in some CI
- * environments).
+ * at Gradle configuration time when EAS uses AGP 8.x. Removing it is safe
+ * because the block only matters when the library is the root project.
  */
 const { withDangerousMod } = require("@expo/config-plugins");
 const fs   = require("fs");
 const path = require("path");
 
-const AGORA_BUILD_GRADLE = path.resolve(
-  __dirname,
-  "../node_modules/react-native-agora/android/build.gradle"
-);
+/** Remove the outermost `buildscript { ... }` block using brace counting. */
+function removeBuildscriptBlock(content) {
+  const keyword = "buildscript";
+  const start = content.indexOf(keyword);
+  if (start === -1) return content; // nothing to remove
+
+  // Find the opening brace
+  const openBrace = content.indexOf("{", start);
+  if (openBrace === -1) return content;
+
+  // Walk forward counting braces until the block closes
+  let depth = 0;
+  let end = -1;
+  for (let i = openBrace; i < content.length; i++) {
+    if (content[i] === "{") depth++;
+    else if (content[i] === "}") {
+      depth--;
+      if (depth === 0) { end = i + 1; break; }
+    }
+  }
+  if (end === -1) return content; // malformed — leave untouched
+
+  // Skip the trailing blank line after the closing brace
+  while (end < content.length && (content[end] === "\n" || content[end] === "\r" || content[end] === " ")) {
+    end++;
+  }
+
+  return content.slice(0, start) + content.slice(end);
+}
 
 module.exports = function withAgoraFix(config) {
   return withDangerousMod(config, [
     "android",
     (cfg) => {
-      if (!fs.existsSync(AGORA_BUILD_GRADLE)) {
+      const agoraBuildGradle = path.resolve(
+        __dirname,
+        "../node_modules/react-native-agora/android/build.gradle"
+      );
+
+      if (!fs.existsSync(agoraBuildGradle)) {
         console.warn("[withAgoraFix] agora build.gradle not found — skipping");
         return cfg;
       }
 
-      let content = fs.readFileSync(AGORA_BUILD_GRADLE, "utf8");
+      const original = fs.readFileSync(agoraBuildGradle, "utf8");
 
-      // Already patched (starts with 'def isNewArchitectureEnabled')
-      if (!content.trimStart().startsWith("buildscript")) {
-        console.log("[withAgoraFix] agora build.gradle already patched — skipping");
+      if (!original.includes("buildscript")) {
+        console.log("[withAgoraFix] agora build.gradle already clean — skipping");
         return cfg;
       }
 
-      // Remove the entire buildscript { ... } block at the top of the file
-      content = content.replace(/^buildscript\s*\{[^}]*(?:\{[^}]*\}[^}]*)?\}\s*\n?/m, "");
+      const patched = removeBuildscriptBlock(original);
 
-      fs.writeFileSync(AGORA_BUILD_GRADLE, content, "utf8");
-      console.log("[withAgoraFix] ✓ Removed conflicting buildscript block from react-native-agora");
+      if (patched === original) {
+        console.warn("[withAgoraFix] Could not remove buildscript block — leaving file unchanged");
+        return cfg;
+      }
+
+      fs.writeFileSync(agoraBuildGradle, patched, "utf8");
+      console.log("[withAgoraFix] ✓ Removed conflicting buildscript block from react-native-agora/android/build.gradle");
       return cfg;
     },
   ]);
