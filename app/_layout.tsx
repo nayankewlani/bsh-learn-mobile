@@ -1,12 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useAuthStore } from "../stores/authStore";
 import { COLORS } from "../constants";
 import { registerPushToken, setupNotificationListeners } from "../services/notificationService";
+import AppSplash from "../components/AppSplash";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function RootLayout() {
   const { loadUser, user } = useAuthStore();
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => { loadUser(); }, []);
 
@@ -18,17 +21,15 @@ export default function RootLayout() {
     return setupNotificationListeners(undefined, (response) => {
       const data = response.notification.request.content.data as { classId?: string; type?: string };
       if (data?.type === "live_session_started" && data.classId) {
-        // Session is live right now — go straight into the call
         router.push({ pathname: "/live-room" as any, params: { classId: data.classId } });
       } else if (data?.type === "session_scheduled") {
-        // Session confirmed but not live yet — show the Live tab so they can see it
         router.push("/(tabs)/live" as any);
       }
     });
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerStyle: { backgroundColor: COLORS.surface }, headerTintColor: COLORS.text, contentStyle: { backgroundColor: COLORS.bg } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -41,6 +42,7 @@ export default function RootLayout() {
         <Stack.Screen name="coming-soon" options={{ headerShown: false }} />
         <Stack.Screen name="program/[slug]" options={{ headerShown: false }} />
       </Stack>
-    </>
+      {showSplash && <AppSplash onDone={() => setShowSplash(false)} />}
+    </ErrorBoundary>
   );
 }

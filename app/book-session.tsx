@@ -10,6 +10,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useThemeStore } from "../stores/themeStore";
 import { RAZORPAY_KEY_ID } from "../constants";
 import client from "../api/client";
+import { blockIOSPurchase } from "../lib/paymentGate";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -51,6 +52,7 @@ export default function BookSessionScreen() {
 
   const handlePay = async () => {
     if (!user) { router.push("/(auth)/login"); return; }
+    if (blockIOSPurchase()) return;
     if (!RazorpayCheckout) {
       Alert.alert("Payment Not Available", "Payments require the full BSH app build (not Expo Go)."); return;
     }

@@ -7,10 +7,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuthStore } from "../stores/authStore";
-import { useThemeStore } from "../stores/themeStore";
+import { useAuthStore, User } from "../stores/authStore";
+import { useThemeStore, ThemeColors } from "../stores/themeStore";
 import { RAZORPAY_KEY_ID } from "../constants";
 import client from "../api/client";
+import { blockIOSPurchase } from "../lib/paymentGate";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -60,7 +61,7 @@ const PS_TIME_SLOTS = ["Morning (8–12)","Afternoon (12–5)","Evening (5–9)"
 
 // ── Apply 1:1 Modal ───────────────────────────────────────────────────────────
 const ApplyModal: React.FC<{
-  expert: Expert; t: ReturnType<typeof useThemeStore>["t"]; user: ReturnType<typeof useAuthStore>["user"]; onClose: ()=>void;
+  expert: Expert; t: ThemeColors; user: User | null; onClose: ()=>void;
 }> = ({ expert, t, user, onClose }) => {
   const [name, setName]     = useState(user?.name ?? "");
   const [phone, setPhone]   = useState(user?.phone ?? "");
@@ -183,7 +184,7 @@ const am = StyleSheet.create({
 
 // ── Free Chat Modal ───────────────────────────────────────────────────────────
 const ChatModal: React.FC<{
-  expert: Expert; t: ReturnType<typeof useThemeStore>["t"]; user: ReturnType<typeof useAuthStore>["user"]; onClose: ()=>void;
+  expert: Expert; t: ThemeColors; user: User | null; onClose: ()=>void;
 }> = ({ expert, t, user, onClose }) => {
   const [name, setName]   = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -298,7 +299,7 @@ const ChatModal: React.FC<{
 
 // ── Expert Card ───────────────────────────────────────────────────────────────
 const ExpertCard: React.FC<{
-  expert: Expert; t: ReturnType<typeof useThemeStore>["t"]; isDark: boolean;
+  expert: Expert; t: ThemeColors; isDark: boolean;
   onApply: ()=>void; onChat: ()=>void; onBook: ()=>void;
 }> = ({ expert, t, isDark, onApply, onChat, onBook }) => {
   const stars = Math.round(expert.rating);
@@ -531,6 +532,7 @@ export default function ConsultationScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
+    if (blockIOSPurchase()) return;
     if (!RazorpayCheckout) {
       Alert.alert("Payment Not Available","Payments require the full BSH app build (not Expo Go)."); return;
     }

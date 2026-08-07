@@ -82,7 +82,7 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         const route = state.routes[routeIndex];
         const focused = state.index === routeIndex;
         const { options } = descriptors[route.key];
-        if (options.href === null) return null;
+        if ((options as any).href === null) return null;
 
         const onPress = () => {
           const event = navigation.emit({ type:"tabPress", target:route.key, canPreventDefault:true });

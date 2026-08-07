@@ -45,6 +45,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withAgoraFix",
       [
         "expo-notifications",
         {

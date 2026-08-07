@@ -5,12 +5,13 @@ import {
   NativeSyntheticEvent, NativeScrollEvent, Alert, Linking, Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { useThemeStore } from "../../stores/themeStore";
 import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
 import { RAZORPAY_KEY_ID } from "../../constants";
 import client from "../../api/client";
+import { blockIOSPurchase } from "../../lib/paymentGate";
 
 // react-native-razorpay (EAS build only)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -21,6 +22,7 @@ const RazorpayCheckout: {
 
 import { Ionicons } from "@expo/vector-icons";
 import { Video, ResizeMode } from "expo-av";
+import Svg, { Circle } from "react-native-svg";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const { width: SW } = Dimensions.get("window");
@@ -68,7 +70,6 @@ const akashicImg     = require("../../assets/akashic.png");
 const bshLogoImg     = require("../../assets/BSH-logo-02.png");
 const mesmerismImg   = require("../../assets/mesmerism.png");
 const pastLifeImg    = require("../../assets/past-life-regression.png");
-const seedhiBaatImg  = require("../../assets/seedhi-baat.jpeg");
 const geetaImg       = require("../../assets/geeta-makhijani.png");
 const slide1         = require("../../assets/slide-1.png");
 const slide4         = require("../../assets/slide-4.png");
@@ -102,21 +103,6 @@ const CAT_IMG: Record<string, number> = {
 };
 
 // ── Static Data ──────────────────────────────────────────────────────────────
-const BANNERS = [
-  { id: "1", bg: "#1e0a4a", badge: "4 Days Workshop", title: "Master Advance Hypnosis",
-    sub: "From beginner techniques to deep trance mastery. Everything you need.",
-    date: "Jul 15, 2026", cta: "Enroll Now", category: "Advance Hypnosis", img: advHypnosisImg },
-  { id: "2", bg: "#0f1a00", badge: "Heal Your Past", title: "Art of Shadow Work",
-    sub: "Heal suppressed emotions and integrate your shadow self deeply.",
-    date: "Jul 15, 2026", cta: "Start Learning", category: "Art of Shadow Work", img: shadowWorkImg },
-  { id: "3", bg: "#020e1f", badge: "Upgrade Your Life", title: "Akashik Records",
-    sub: "Access universal knowledge and discover your soul's true purpose.",
-    date: "Jul 15, 2026", cta: "Join Batch", category: "Akashik", img: akashicImg },
-  { id: "4", bg: "#1a0600", badge: "🔴 Live Now", title: "Seedhi Baat with Dr. Pradeep",
-    sub: "Simple, personal and reassuring. Move forward with clarity.",
-    date: "Live Now", cta: "Join Live", category: "Seedhi Baat", img: seedhiBaatImg, isLive: true },
-];
-
 const GOALS = [
   { img: advHypnosisImg, name: "Advance\nHypnosis",    count: "12 Batches" },
   { img: hypnosis2Img,   name: "Hypnosis 2.0",          count: "8 Batches"  },
@@ -132,7 +118,6 @@ const GOALS = [
 const TRAINERS = [
   { name: "Dr. Pradeep Kumar",  role: "Clinical Hypnotherapist & NLP Master",  color: "#7c3aed", exp: "20+ Yrs", sessions: "5,000+", badge: "POPULAR",       subjects: ["Hypnosis","NLP"], rating: 4.9 },
   { name: "Geeta Makhijani",    role: "Shadow Work & Emotional Healing Expert", color: "#0d9488", exp: "12+ Yrs", sessions: "2,500+", badge: "MASTER TRAINER", subjects: ["Shadow Work","Healing"], rating: 4.8 },
-  { name: "Amit Narang",        role: "Master Hypnotherapist",                  color: "#7c3aed", exp: "15+ Yrs", sessions: "3,000+", badge: "MASTER TRAINER", subjects: ["Hypnosis","Therapy"], rating: 4.7 },
   { name: "Nalini J. Yadav",    role: "Emotional Healing Expert",               color: "#0d9488", exp: "10+ Yrs", sessions: "1,500+", badge: "POPULAR",       subjects: ["Emotional Healing"], rating: 4.8 },
   { name: "Vikas Bhardwaj",     role: "NLP & Life Transformation Coach",        color: "#2563eb", exp: "8+ Yrs",  sessions: "1,200+", badge: "POPULAR",       subjects: ["NLP","Coaching"], rating: 4.6 },
   { name: "Dr. Puneet Jain",    role: "Autism & Special Needs Expert",          color: "#16a34a", exp: "12+ Yrs", sessions: "800+",   badge: "SPECIALIST",    subjects: ["Autism","Healing"], rating: 4.9 },
@@ -157,12 +142,12 @@ const EDUCATORS = [
 ];
 
 const BATCHES = [
-  { id:"b1", img:advHypnosisImg, tags:["Hindi","Full Course"],    title:"Advance Hypnosis — Master Batch 2026",          educator:"Dr. Pradeep Kumar", status:"upcoming" as const, startLabel:"Enroll Now · 6-Month Certification",  price:"₹29,999", originalPrice:"", saving:"", category:"Advance Hypnosis"   },
-  { id:"b2", img:hypnosis2Img,   tags:["Hindi","Full Course"],    title:"Hypnosis 2.0 — Upgrade Your Mind",              educator:"Dr. Pradeep Kumar", status:"upcoming" as const, startLabel:"Starts 1 Jun 2026",             price:"₹2,999", originalPrice:"₹4,500", saving:"33%", category:"Hypnosis 2.0"       },
-  { id:"b3", img:shadowWorkImg,  tags:["Hindi","Full Course"],    title:"Art of Shadow Work — Deep Healing",             educator:"Geeta Makhijani",   status:"upcoming" as const, startLabel:"Starts Soon · Registration Open", price:"₹2,499", originalPrice:"₹3,999", saving:"37%", category:"Art of Shadow Work"  },
-  { id:"b4", img:reikiImg,       tags:["Hindi / English","Level 1 & 2"], title:"Reiki — Universal Life Energy Certification", educator:"BSH Faculty",   status:"upcoming" as const, startLabel:"Starts 15 Jun 2026",            price:"₹1,999", originalPrice:"₹3,000", saving:"33%", category:"Reiki"              },
-  { id:"b5", img:deepTranceImg,  tags:["Hindi","Workshop"],       title:"Deep Trance Level — 4 Day Intensive",           educator:"Dr. Pradeep Kumar", status:"upcoming" as const, startLabel:"Starts 20 Jun 2026",             price:"₹1,499", originalPrice:"₹2,500", saving:"40%", category:"Deep Trance Level"   },
-  { id:"b6", img:akashicImg,     tags:["Hindi / English","Full Course"], title:"Akashik Records — Access Universal Knowledge", educator:"BSH Faculty",  status:"upcoming" as const, startLabel:"Starts Soon · Registration Open", price:"₹2,999", originalPrice:"₹4,999", saving:"40%", category:"Akashik"            },
+  { id:"b1", isActive:true,  img:advHypnosisImg, tags:["Hindi","Full Course"],    title:"Advance Hypnosis — Master Batch 2026",          educator:"Dr. Pradeep Kumar", status:"upcoming" as const, startLabel:"Enroll Now · 6-Month Certification",  price:"₹29,999", originalPrice:"", saving:"", category:"Advance Hypnosis"   },
+  { id:"b2", isActive:true,  img:hypnosis2Img,   tags:["Hindi","Full Course"],    title:"Hypnosis 2.0 — Upgrade Your Mind",              educator:"Dr. Pradeep Kumar", status:"upcoming" as const, startLabel:"Starts 1 Jun 2026",             price:"₹2,699", originalPrice:"₹4,500", saving:"40%", category:"Hypnosis 2.0"       },
+  { id:"b3", isActive:false, img:shadowWorkImg,  tags:["Hindi","Full Course"],    title:"Art of Shadow Work — Deep Healing",             educator:"Geeta Makhijani",   status:"upcoming" as const, startLabel:"Starts Soon · Registration Open", price:"₹2,499", originalPrice:"₹3,999", saving:"37%", category:"Art of Shadow Work"  },
+  { id:"b4", isActive:false, img:reikiImg,       tags:["Hindi / English","Level 1 & 2"], title:"Reiki — Universal Life Energy Certification", educator:"BSH Faculty",   status:"upcoming" as const, startLabel:"Starts 15 Jun 2026",            price:"₹1,999", originalPrice:"₹3,000", saving:"33%", category:"Reiki"              },
+  { id:"b5", isActive:false, img:deepTranceImg,  tags:["Hindi","Workshop"],       title:"Deep Trance Level — 4 Day Intensive",           educator:"Dr. Pradeep Kumar", status:"upcoming" as const, startLabel:"Starts 20 Jun 2026",             price:"₹1,499", originalPrice:"₹2,500", saving:"40%", category:"Deep Trance Level"   },
+  { id:"b6", isActive:false, img:akashicImg,     tags:["Hindi / English","Full Course"], title:"Akashik Records — Access Universal Knowledge", educator:"BSH Faculty",  status:"upcoming" as const, startLabel:"Starts Soon · Registration Open", price:"₹2,999", originalPrice:"₹4,999", saving:"40%", category:"Akashik"            },
 ];
 
 const HEAL_CATS = ["All","Breathing","Focus","Sleep","Healing","Student"];
@@ -218,11 +203,8 @@ export default function HomeScreen() {
   const { user } = useAuthStore();
   const { isDark, t, toggle: toggleTheme } = useThemeStore();
   const insets = useSafeAreaInsets();
-  const bannerRef = useRef<FlatList>(null);
-  const [activeBanner, setActiveBanner] = useState(0);
-
   // Header scroll-hide animation
-  const HEADER_H = 128 + insets.top;
+  const HEADER_H = 56 + insets.top;
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollYRef = useRef(0);
   const headerHiddenRef = useRef(false);
@@ -286,6 +268,18 @@ export default function HomeScreen() {
   const [healCat, setHealCat] = useState("All");
   const [healQ, setHealQ] = useState("");
 
+  // Healing Tool Player
+  const [healPlayer, setHealPlayer] = useState<HealTool | null>(null);
+  const [playerRunning, setPlayerRunning] = useState(false);
+  const [playerElapsed, setPlayerElapsed] = useState(0);
+  const playerIvRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playerGlowAnim = useRef(new Animated.Value(0.85)).current;
+  const playerOrb1Anim = useRef(new Animated.Value(0)).current;
+  const playerOrb2Anim = useRef(new Animated.Value(0)).current;
+  const glowLoopRef  = useRef<Animated.CompositeAnimation | null>(null);
+  const orb1LoopRef  = useRef<Animated.CompositeAnimation | null>(null);
+  const orb2LoopRef  = useRef<Animated.CompositeAnimation | null>(null);
+
   // Breathing animation
   const [breathModalOpen, setBreathModalOpen] = useState(false);
   const [breathPhase, setBreathPhase] = useState<"inhale"|"hold1"|"exhale"|"hold2">("inhale");
@@ -340,10 +334,24 @@ export default function HomeScreen() {
 
   // ── Live Sessions Hero (SoulSensei-style video hero with countdown) ─────────
   interface LiveHeroSession { _id: string; title: string; educator: { _id: string; name: string; avatar?: string } | string; scheduledAt: string; status: string; enrolledStudents: string[]; thumbnailUrl?: string; }
+  interface HeroBannerItem { _id: string; _type: "banner"; title: string; superTitle: string; educatorName: string; badgeText: string; badgeBg: string; showTimer: boolean; timerEndsAt?: string; videoUrl?: string; thumbnailUrl?: string; ctaLink: string; }
+  interface UpcomingClassItem { _id: string; title: string; educatorName: string; scheduledAt: string; status: string; thumbnailUrl?: string; ctaLink: string; }
+  type HeroSlide = (LiveHeroSession & { _type?: "live" }) | HeroBannerItem;
   const [liveHeroSessions, setLiveHeroSessions] = useState<LiveHeroSession[]>([]);
-  const [heroIndex, setHeroIndex] = useState(0);
-  const [heroMuted, setHeroMuted] = useState(true); // start muted (autoplay rule), tap speaker to unmute
+  const [heroBanners, setHeroBanners]           = useState<HeroBannerItem[]>([]);
+  const [upcomingClasses, setUpcomingClasses]   = useState<UpcomingClassItem[]>([]);
+  const [heroIndex, setHeroIndex]     = useState(0);
+  const [heroMuted, setHeroMuted]     = useState(true);
+  const [isTabFocused, setIsTabFocused] = useState(true);
   const heroRef = useRef<FlatList>(null);
+
+  // Pause all hero videos when navigating away from this tab
+  useFocusEffect(
+    useCallback(() => {
+      setIsTabFocused(true);
+      return () => setIsTabFocused(false);
+    }, [])
+  );
   const [, setCountdownTick] = useState(0); // forces re-render every second
 
   const fmtCountdown = (scheduledAt: string, status: string): { label: string; color: string; bg: string } => {
@@ -364,14 +372,20 @@ export default function HomeScreen() {
   };
 
   // ── Effects ─────────────────────────────────────────────────────────────────
-  // Fetch upcoming + live sessions for hero carousel
+  // Fetch hero banners (admin-uploaded) and live sessions for hero carousel
   useEffect(() => {
+    client.get("/hero-banners").then(({ data }) => {
+      setHeroBanners((data.banners ?? []).map((b: any) => ({ ...b, _type: "banner" })));
+    }).catch(() => {});
+    client.get("/upcoming-classes").then(({ data }) => {
+      setUpcomingClasses(data.classes ?? []);
+    }).catch(() => {});
     Promise.all([
       client.get("/live-classes?status=live"),
       client.get("/live-classes?status=scheduled"),
     ]).then(([live, sched]) => {
       const combined = [...(live.data.classes ?? []), ...(sched.data.classes ?? [])];
-      setLiveHeroSessions(combined.slice(0, 8)); // max 8 hero slides
+      setLiveHeroSessions(combined.slice(0, 8));
     }).catch(() => {});
   }, []);
 
@@ -381,27 +395,25 @@ export default function HomeScreen() {
     return () => clearInterval(iv);
   }, []);
 
+  // Combined hero slides: admin banners first, then live sessions
+  const heroSlides = useMemo<HeroSlide[]>(() => [
+    ...heroBanners,
+    ...liveHeroSessions.map(s => ({ ...s, _type: "live" as const })),
+  ], [heroBanners, liveHeroSessions]);
+
   // Auto-cycle hero
   useEffect(() => {
-    if (liveHeroSessions.length === 0) return;
+    if (heroSlides.length === 0) return;
     const t = setInterval(() => {
       setHeroIndex(i => {
-        const next = (i + 1) % Math.max(liveHeroSessions.length, 1);
-        heroRef.current?.scrollToIndex({ index: next, animated: true });
+        const total = heroSlides.length;
+        const next = total > 0 ? (i + 1) % total : 0;
+        try { heroRef.current?.scrollToIndex({ index: next, animated: true }); } catch {}
         return next;
       });
     }, 5000);
     return () => clearInterval(t);
-  }, [liveHeroSessions.length]);
-
-  useEffect(() => {
-    const t2 = setInterval(() => {
-      const next = (activeBanner + 1) % BANNERS.length;
-      bannerRef.current?.scrollToIndex({ index:next, animated:true });
-      setActiveBanner(next);
-    }, 4500);
-    return () => clearInterval(t2);
-  }, [activeBanner]);
+  }, [heroSlides.length]);
 
   // Fetch trainers on mount — same lifecycle as consultation page (no user dependency)
   useEffect(() => {
@@ -451,6 +463,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!breathModalOpen) {
       if (breathIvRef.current) clearInterval(breathIvRef.current);
+      breathAnimVal.stopAnimation();
       breathPhaseIdxRef.current=0; breathSecsRef.current=4;
       setBreathPhase("inhale"); setBreathSecs(4); setBreathCycles(0);
       breathAnimVal.setValue(0.7); return;
@@ -471,7 +484,10 @@ export default function HomeScreen() {
       }
       setBreathSecs(breathSecsRef.current);
     }, 1000);
-    return () => { if (breathIvRef.current) clearInterval(breathIvRef.current); };
+    return () => {
+      if (breathIvRef.current) clearInterval(breathIvRef.current);
+      breathAnimVal.stopAnimation();
+    };
   }, [breathModalOpen]);
 
   const POM_TOTALS: Record<string,number> = { focus:25*60, shortBreak:5*60, longBreak:15*60 };
@@ -525,6 +541,7 @@ export default function HomeScreen() {
     }
     if (tool.interactive==="breathing") setBreathModalOpen(true);
     else if (tool.interactive==="pomodoro") setPomModalOpen(true);
+    else setHealPlayer(tool);
   };
 
   const handleClassTap = useCallback((cls: HomeClassType) => {
@@ -539,6 +556,7 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
+    if (blockIOSPurchase()) return;
     if (!RazorpayCheckout) {
       Alert.alert("Payment Not Available","Payments require the full BSH app build."); return;
     }
@@ -572,6 +590,7 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
+    if (blockIOSPurchase()) return;
     if (!RazorpayCheckout) {
       Alert.alert("Payment Not Available","Payments require the full BSH app build."); return;
     }
@@ -599,11 +618,6 @@ export default function HomeScreen() {
     } finally { setPlusLoading(false); }
   };
 
-  const onBannerScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
-    if (idx>=0 && idx<BANNERS.length) setActiveBanner(idx);
-  };
-
   const BREATH_COLORS: Record<string,string> = { inhale:"#4facfe",hold1:"#00f2fe",exhale:"#a78bfa",hold2:"#fbc2eb" };
   const BREATH_LABELS: Record<string,string> = { inhale:"Inhale ↑",hold1:"Hold •",exhale:"Exhale ↓",hold2:"Hold •" };
   const POM_LABELS: Record<string,string> = { focus:"Focus Time",shortBreak:"Short Break ☕",longBreak:"Long Break 🎉" };
@@ -613,6 +627,107 @@ export default function HomeScreen() {
     (healCat==="All"||tool.category===healCat) &&
     (!healQ||tool.title.toLowerCase().includes(healQ.toLowerCase())||tool.desc.toLowerCase().includes(healQ.toLowerCase()))
   );
+
+  // ── Heal Player timer ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!playerRunning) {
+      if (playerIvRef.current) clearInterval(playerIvRef.current);
+      return;
+    }
+    playerIvRef.current = setInterval(() => setPlayerElapsed(s => s + 1), 1000);
+    return () => { if (playerIvRef.current) clearInterval(playerIvRef.current); };
+  }, [playerRunning]);
+
+  useEffect(() => {
+    // Always stop any running loops first to prevent accumulation
+    glowLoopRef.current?.stop();
+    orb1LoopRef.current?.stop();
+    orb2LoopRef.current?.stop();
+    glowLoopRef.current = null;
+    orb1LoopRef.current = null;
+    orb2LoopRef.current = null;
+
+    if (!healPlayer) {
+      setPlayerRunning(false);
+      setPlayerElapsed(0);
+      if (playerIvRef.current) clearInterval(playerIvRef.current);
+      playerGlowAnim.stopAnimation(() => playerGlowAnim.setValue(0.85));
+      return;
+    }
+    // Glow pulse loop
+    glowLoopRef.current = Animated.loop(Animated.sequence([
+      Animated.timing(playerGlowAnim, { toValue: 1.18, duration: 1800, useNativeDriver: true }),
+      Animated.timing(playerGlowAnim, { toValue: 0.82, duration: 1800, useNativeDriver: true }),
+    ]));
+    glowLoopRef.current.start();
+    // Orb drift
+    orb1LoopRef.current = Animated.loop(Animated.sequence([
+      Animated.timing(playerOrb1Anim, { toValue: 1, duration: 4200, useNativeDriver: true }),
+      Animated.timing(playerOrb1Anim, { toValue: 0, duration: 4200, useNativeDriver: true }),
+    ]));
+    orb1LoopRef.current.start();
+    orb2LoopRef.current = Animated.loop(Animated.sequence([
+      Animated.timing(playerOrb2Anim, { toValue: 1, duration: 5600, useNativeDriver: true }),
+      Animated.timing(playerOrb2Anim, { toValue: 0, duration: 5600, useNativeDriver: true }),
+    ]));
+    orb2LoopRef.current.start();
+    setPlayerRunning(true);
+    return () => {
+      glowLoopRef.current?.stop();
+      orb1LoopRef.current?.stop();
+      orb2LoopRef.current?.stop();
+    };
+  }, [healPlayer]);
+
+  const PLAYER_SCRIPTS: Record<string, string[]> = {
+    HYPNOSIS: [
+      "Find a comfortable position and gently close your eyes…",
+      "Take three slow, deep breaths — in through the nose, out through the mouth…",
+      "Let every muscle begin to soften and release…",
+      "Feel a wave of calm spreading from your head all the way to your toes…",
+      "Your mind is clear, open, and completely at ease…",
+      "Allow the healing to flow through every part of your being…",
+      "You are safe, deeply relaxed, and at total peace…",
+      "Rest here as long as you need. The healing continues…",
+    ],
+    AUDIO: [
+      "Find a quiet space and settle in comfortably…",
+      "Take a deep breath in… hold gently… and slowly release…",
+      "Let these words wash over you like gentle waves…",
+      "Your mind is open and receptive to positive change…",
+      "Breathe naturally — let the session guide you deeper…",
+      "You are doing beautifully. Stay with this feeling…",
+      "Let this energy fill every corner of your being…",
+      "Carry this peace and clarity with you all day…",
+    ],
+    GUIDED: [
+      "Settle into a comfortable seated or lying position…",
+      "Close your eyes and take three cleansing breaths…",
+      "Notice the natural rhythm of your breath — no need to change it…",
+      "With each exhale, release any tension you're holding…",
+      "Your body knows how to heal itself. Trust the process…",
+      "Deepen your awareness with every breath cycle…",
+      "You are whole. You are well. You are at peace…",
+      "Gently return to the room whenever you feel ready…",
+    ],
+  };
+
+  const playerDurationSecs = healPlayer ? (parseInt(healPlayer.duration) || 10) * 60 : 600;
+  const playerPhases       = PLAYER_SCRIPTS[healPlayer?.type ?? "AUDIO"] ?? PLAYER_SCRIPTS.AUDIO;
+  const phaseInterval      = Math.floor(playerDurationSecs / playerPhases.length);
+  const currentPhaseIdx    = Math.min(Math.floor(playerElapsed / Math.max(phaseInterval, 1)), playerPhases.length - 1);
+  const currentPhaseText   = playerPhases[currentPhaseIdx];
+  const playerProgress     = Math.min(playerElapsed / playerDurationSecs, 1);
+
+  const fmtPlayerTime = (s: number) => {
+    const m = Math.floor(s / 60); const sec = s % 60;
+    return `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+  };
+  const PLAYER_CIRC_R = 88;
+  const PLAYER_CIRC_C = 2 * Math.PI * PLAYER_CIRC_R;
+  const playerDashOff = PLAYER_CIRC_C * (1 - playerProgress);
+  const playerOrb1Y   = playerOrb1Anim.interpolate({ inputRange:[0,1], outputRange:[0,-40] });
+  const playerOrb2Y   = playerOrb2Anim.interpolate({ inputRange:[0,1], outputRange:[0,50] });
 
   const featuredClasses = homeClasses.filter(c=>c.isFeatured);
   const subjectClasses  = homeClasses.filter(c=>c.subject===activeSubject);
@@ -627,6 +742,7 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
+    if (blockIOSPurchase()) return;
     // If admin set a Razorpay payment link, open it directly
     const directLink = (prog as any).razorpayPaymentLink;
     if (directLink) { Linking.openURL(directLink).catch(()=>{}); setProgModal(null); return; }
@@ -664,6 +780,7 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
+    if (blockIOSPurchase()) return;
     if (course.razorpayPaymentLink) {
       Linking.openURL(course.razorpayPaymentLink).catch(()=>{});
       setBatchModal(null); return;
@@ -726,6 +843,7 @@ export default function HomeScreen() {
   }, [apiPrograms]);
 
   const displayBatches = useMemo(() => {
+    const ACTIVE_CATS = new Set(["Advance Hypnosis", "Hypnosis 2.0"]);
     if (apiBatches.length > 0) {
       return apiBatches.map(c => ({
         id:    c._id,
@@ -740,6 +858,7 @@ export default function HomeScreen() {
         originalPrice: c.discountPrice > 0 ? `₹${Math.round(c.price / 100).toLocaleString("en-IN")}` : "",
         saving: c.discountPrice > 0 ? `${Math.round((1 - c.discountPrice / c.price) * 100)}%` : "",
         category: c.category,
+        isActive: ACTIVE_CATS.has(c.category),
         _course: c,
       }));
     }
@@ -764,32 +883,42 @@ export default function HomeScreen() {
     <View style={[s.root, { backgroundColor: t.bg }]}>
 
       {/* ── Floating Header ── */}
-      <Animated.View style={[s.headerWrapper, { paddingTop:insets.top, backgroundColor:t.navBg, transform:[{translateY:headerTranslateY}] }]}>
+      {/* Floating transparent header — overlays the hero */}
+      <Animated.View style={[s.headerWrapper, { paddingTop:insets.top, transform:[{translateY:headerTranslateY}] }]}>
         <View style={s.headerRow}>
-          <Image source={bshLogoImg} style={s.headerLogo} resizeMode="contain" />
-          <View style={s.brandArea}>
-            <Text style={s.brandName}>BSH</Text>
-            <Text style={s.brandSub}>Healers</Text>
+          {/* Logo + brand */}
+          <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
+            <Image source={bshLogoImg} style={s.headerLogo} resizeMode="contain" />
+            <View>
+              <Text style={s.brandName}>BSH</Text>
+              <Text style={s.brandSub}>Healers</Text>
+            </View>
           </View>
 
+          {/* Right actions */}
           <View style={s.headerActions}>
-            {/* Live indicator — opens 3-option menu */}
+            {/* Live pill */}
             <TouchableOpacity style={s.liveBtn} onPress={()=>setLiveMenuOpen(true)}>
               <View style={s.liveDot} />
               <Text style={s.liveTxt}>Live</Text>
             </TouchableOpacity>
 
-            {/* Consultation shortcut with pulsing live dot */}
+            {/* Chat */}
             <TouchableOpacity style={[s.consultBtn, {position:"relative"}]} onPress={()=>router.push("/(tabs)/consultation" as any)}>
-              <Text style={s.consultTxt}>💬</Text>
-              <View style={{position:"absolute",top:2,right:2,width:8,height:8,borderRadius:4,
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff"
+                style={{ textShadowColor:"rgba(0,0,0,0.7)", textShadowOffset:{width:0,height:1}, textShadowRadius:6 } as any} />
+              <View style={{position:"absolute",top:0,right:0,width:9,height:9,borderRadius:5,
                 backgroundColor: chatDotGreen ? "#22c55e" : "#ef4444",
-                borderWidth:1.5, borderColor:"#fff"}} />
+                borderWidth:1.5, borderColor:"rgba(0,0,0,0.6)"}} />
             </TouchableOpacity>
 
             {/* Theme toggle */}
             <TouchableOpacity style={s.themeBtn} onPress={toggleTheme}>
-              <Text style={{ fontSize:16 }}>{isDark ? "☀️" : "🌙"}</Text>
+              <Ionicons
+                name={isDark ? "sunny-outline" : "moon-outline"}
+                size={22} color="#fff"
+                style={{ textShadowColor:"rgba(0,0,0,0.7)", textShadowOffset:{width:0,height:1}, textShadowRadius:6 } as any}
+              />
             </TouchableOpacity>
 
             {/* Avatar */}
@@ -804,101 +933,131 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Search for Healers */}
-        <View style={[s.searchBar, {backgroundColor: isDark ? "#1e1b4b" : "#ffffff"}]}>
-          <Text style={s.searchIcon}>🔍</Text>
-          <TextInput
-            value={healerQuery}
-            onChangeText={setHealerQuery}
-            placeholder="Search for Healers..."
-            placeholderTextColor={isDark ? "#6b7280" : "#9ca3af"}
-            style={[s.searchPlaceholder, {color: isDark ? "#e5e7eb" : "#111827", flex:1, padding:0}]}
-            returnKeyType="search"
-          />
-          {healerQuery.length > 0 && (
-            <TouchableOpacity onPress={()=>setHealerQuery("")} hitSlop={{top:8,bottom:8,left:8,right:8}}>
-              <Text style={{color:"#9ca3af",fontSize:15}}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
       </Animated.View>
 
       {/* ── Scrollable Content ── */}
       <ScrollView showsVerticalScrollIndicator={false} onScroll={handleMainScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingTop:HEADER_H+6, paddingBottom:100 }}>
+        contentContainerStyle={{ paddingTop:0, paddingBottom:100 }}>
 
         {/* ═══════════════ HERO: LIVE / UPCOMING SESSIONS CAROUSEL ═══════════════
              Inspired by SoulSensei: full-bleed trainer photo, countdown timer,
              attendee count — videos slot in via GCS when uploaded by admin. */}
-        {liveHeroSessions.length > 0 ? (
-          <View style={{ height: SW * 1.1 }}>
+        {heroSlides.length > 0 && (
+          /* ── Full-bleed hero carousel (admin banners + live sessions) ── */
+          <View style={{ height: SW * 1.1 + insets.top }}>
             <FlatList
               ref={heroRef}
-              data={liveHeroSessions}
+              data={heroSlides}
               horizontal pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={item => item._id}
+              getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+              onScrollToIndexFailed={info => {
+                heroRef.current?.scrollToOffset({ offset: SW * info.index, animated: true });
+              }}
               onScroll={e => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
                 if (idx !== heroIndex) setHeroIndex(idx);
               }}
               scrollEventThrottle={16}
-              renderItem={({ item }) => {
-                const eduObj = typeof item.educator === "object" ? item.educator : null;
-                const eduName = eduObj?.name ?? (typeof item.educator === "string" ? item.educator : "BSH Healer");
-                const countdown = fmtCountdown(item.scheduledAt, item.status);
+              renderItem={({ item, index: slideIdx }) => {
+                const isBanner = (item as HeroBannerItem)._type === "banner";
+                const isActiveSlide = slideIdx === heroIndex && isTabFocused;
+
+                // ── Banner slide ──────────────────────────────────────────
+                if (isBanner) {
+                  const b = item as HeroBannerItem;
+                  const badgeLabel = b.showTimer && b.timerEndsAt
+                    ? fmtCountdown(b.timerEndsAt, "scheduled").label
+                    : b.badgeText;
+                  const badgeBg = b.showTimer && b.timerEndsAt
+                    ? fmtCountdown(b.timerEndsAt, "scheduled").bg
+                    : (b.badgeBg || "#7c3aed");
+                  const dest = b.ctaLink || ("/(tabs)/live" as any);
+                  return (
+                    <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
+                      onPress={() => router.push(dest as any)}>
+                      {b.videoUrl ? (
+                        <Video source={{ uri: b.videoUrl }}
+                          style={{ position:"absolute", width:"100%", height:"100%" }}
+                          resizeMode={ResizeMode.COVER}
+                          shouldPlay={isActiveSlide} isLooping isMuted={heroMuted} useNativeControls={false} />
+                      ) : b.thumbnailUrl ? (
+                        <Image source={{ uri: b.thumbnailUrl }} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
+                      ) : (
+                        <Image source={slide1} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
+                      )}
+                      <View style={{ position:"absolute", top:0, left:0, right:0, height: insets.top + 90 }}>
+                        <View style={{ flex:1, backgroundColor:"rgba(4,2,14,0.45)" }} />
+                      </View>
+                      <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(6,3,20,0.18)" }} />
+                      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"40%", backgroundColor:"rgba(4,2,14,0.22)" }} />
+                      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"28%", backgroundColor:"rgba(4,2,14,0.46)" }} />
+                      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"16%", backgroundColor:"rgba(4,2,14,0.62)" }} />
+                      {b.videoUrl && (
+                        <TouchableOpacity style={[s.heroMuteBtn, { top: insets.top + 56 }]} onPress={() => setHeroMuted(m => !m)}>
+                          <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={15} color="#fff" />
+                        </TouchableOpacity>
+                      )}
+                      <View style={s.heroOverlay}>
+                        {b.superTitle ? <Text style={s.heroSuperTitle}>{b.superTitle}</Text> : null}
+                        {b.educatorName ? <Text style={s.heroEducatorName}>{b.educatorName}</Text> : null}
+                        <Text style={s.heroSessionTitle} numberOfLines={3}>{b.title}</Text>
+                        {badgeLabel ? (
+                          <View style={[s.heroCountdownBadge, { backgroundColor: badgeBg }]}>
+                            <Text style={s.heroCountdownTxt}>{badgeLabel}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }
+
+                // ── Live session slide ────────────────────────────────────
+                const live = item as LiveHeroSession;
+                const eduObj = typeof live.educator === "object" ? live.educator : null;
+                const eduName = eduObj?.name ?? (typeof live.educator === "string" ? live.educator : "BSH Healer");
+                const countdown = fmtCountdown(live.scheduledAt, live.status);
                 const avatar = eduObj?.avatar ? { uri: eduObj.avatar } : slide1;
-                const heroVideo = (item as any).heroVideoUrl as string | undefined;
+                const heroVideo = (live as any).heroVideoUrl as string | undefined;
                 return (
-                  <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 }}
+                  <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
                     onPress={() => router.push("/(tabs)/live" as any)}>
-                    {/* Video hero when available, else fall back to trainer photo */}
                     {heroVideo ? (
                       <Video source={{ uri: heroVideo }}
                         style={{ position:"absolute", width:"100%", height:"100%" }}
                         resizeMode={ResizeMode.COVER}
-                        shouldPlay isLooping isMuted={heroMuted} useNativeControls={false} />
+                        shouldPlay={isActiveSlide} isLooping isMuted={heroMuted} useNativeControls={false} />
                     ) : (
                       <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
                     )}
-                    {/* Dark gradient from bottom */}
-                    <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.45)" }} />
-                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"55%",
-                      backgroundColor:"transparent",
-                      // simulate gradient via multiple overlapping views
-                    }}>
-                      <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.7)" }} />
+                    <View style={{ position:"absolute", top:0, left:0, right:0, height: insets.top + 90 }}>
+                      <View style={{ flex:1, backgroundColor:"rgba(4,2,14,0.45)" }} />
                     </View>
-
-                    {/* Mute/unmute button (video-ready for GCS uploads) */}
-                    <TouchableOpacity style={s.heroMuteBtn} onPress={() => setHeroMuted(m => !m)}>
-                      <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={16} color="#fff" />
+                    <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(6,3,20,0.18)" }} />
+                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"40%", backgroundColor:"rgba(4,2,14,0.22)" }} />
+                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"28%", backgroundColor:"rgba(4,2,14,0.46)" }} />
+                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"16%", backgroundColor:"rgba(4,2,14,0.62)" }} />
+                    <TouchableOpacity style={[s.heroMuteBtn, { top: insets.top + 56 }]} onPress={() => setHeroMuted(m => !m)}>
+                      <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={15} color="#fff" />
                     </TouchableOpacity>
-
-                    {/* Overlay content */}
                     <View style={s.heroOverlay}>
-                      <Text style={s.heroSuperTitle}>LIVE HEALING SESSIONS WITH</Text>
-                      <Text style={s.heroSuperTitle}>EXPERT HEALERS</Text>
-                      <Text style={s.heroEducatorName}>{eduName.toUpperCase()}</Text>
-                      <Text style={s.heroSessionTitle} numberOfLines={2}>{item.title}</Text>
-
-                      {/* Countdown badge */}
+                      <Text style={s.heroSuperTitle}>WITH EXPERT HEALERS</Text>
+                      <Text style={s.heroEducatorName}>{eduName}</Text>
+                      <Text style={s.heroSessionTitle} numberOfLines={3}>{live.title}</Text>
                       <View style={[s.heroCountdownBadge, { backgroundColor: countdown.bg }]}>
                         <Text style={s.heroCountdownTxt}>{countdown.label}</Text>
                       </View>
-
-                      {/* Attendee count */}
-                      {item.enrolledStudents?.length > 0 && (
+                      {live.enrolledStudents?.length > 0 && (
                         <View style={s.heroAttendeeRow}>
-                          {[...item.enrolledStudents].slice(0, 3).map((_, ai) => (
+                          {[...live.enrolledStudents].slice(0, 3).map((_, ai) => (
                             <View key={ai} style={[s.heroAvatarThumb, { left: ai * 16, backgroundColor: ["#7c3aed","#0d9488","#db2777"][ai] }]}>
                               <Text style={{ color:"#fff", fontSize:8 }}>👤</Text>
                             </View>
                           ))}
-                          <Text style={[s.heroAttendeeTxt, { marginLeft: Math.min(item.enrolledStudents.length, 3) * 16 + 8 }]}>
-                            +{item.enrolledStudents.length} Attending
+                          <Text style={[s.heroAttendeeTxt, { marginLeft: Math.min(live.enrolledStudents.length, 3) * 16 + 8 }]}>
+                            +{live.enrolledStudents.length} Attending
                           </Text>
                         </View>
                       )}
@@ -909,50 +1068,38 @@ export default function HomeScreen() {
             />
             {/* Pagination dots */}
             <View style={s.heroDotsRow}>
-              {liveHeroSessions.map((_, i) => (
+              {heroSlides.map((_, i) => (
                 <View key={i} style={[s.heroDot, i === heroIndex && s.heroDotActive]} />
               ))}
             </View>
           </View>
-        ) : (
-          /* Fallback to existing static banners when no live sessions */
-          <>
-            <FlatList ref={bannerRef} data={BANNERS} horizontal pagingEnabled
-              showsHorizontalScrollIndicator={false} keyExtractor={(item)=>item.id}
-              onScroll={onBannerScroll} scrollEventThrottle={16}
-              renderItem={({ item }) => (
-                <View style={{ width:SW, height:280 }}>
-                  <View style={[s.bannerCard, { backgroundColor:item.bg }]}>
-                    <Image source={item.img} style={s.bannerEducatorImg} />
-                    <View style={s.bannerGradientMask} />
-                    <View style={s.bannerBody}>
-                      <View style={s.bannerBadge}><Text style={s.bannerBadgeText}>{item.badge}</Text></View>
-                      <Text style={s.bannerTitle}>{item.title}</Text>
-                      <Text style={s.bannerSub} numberOfLines={2}>{item.sub}</Text>
-                      <TouchableOpacity style={s.bannerCta} onPress={()=>{
-                        if (item.id==="4") setBookModal("freeCall");
-                        else router.push({ pathname:"/(tabs)/explore", params:{ category:item.category } });
-                      }}>
-                        <Text style={s.bannerCtaTxt}>{item.cta}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              )}
-            />
-            <View style={s.dotsRow}>
-              {BANNERS.map((_,i)=>(
-                <View key={i} style={[s.dot, i===activeBanner && s.dotActive]} />
-              ))}
-            </View>
-          </>
         )}
+
+        {/* ── Floating search bar — overlaps the bottom of the hero ── */}
+        <View style={s.floatingSearchWrap}>
+          <View style={[s.floatingSearch, { backgroundColor: isDark ? "#13103a" : "#ffffff" }]}>
+            <Text style={s.searchIcon}>🔍</Text>
+            <TextInput
+              value={healerQuery}
+              onChangeText={setHealerQuery}
+              placeholder="Search for Healers..."
+              placeholderTextColor={isDark ? "#6b7280" : "#9ca3af"}
+              style={[s.searchPlaceholder, { color: isDark ? "#e5e7eb" : "#111827", flex:1, padding:0 }]}
+              returnKeyType="search"
+            />
+            {healerQuery.length > 0 && (
+              <TouchableOpacity onPress={()=>setHealerQuery("")} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+                <Text style={{color:"#9ca3af",fontSize:15}}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
 
         {/* ═══════════════ SPIRITUAL GUIDANCE FOR EVERY NEED ═══════════════
              SoulSensei-style 2×3 photo goal grid — person photo background,
              uppercase text label, tap links to relevant content. */}
-        <View style={{ paddingHorizontal:0, paddingTop:22, paddingBottom:4 }}>
-          <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]}>Spiritual Guidance For Every Need</Text>
+        <View style={{ paddingHorizontal:0, paddingTop:28, paddingBottom:4 }}>
+          <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]} numberOfLines={1}>Spiritual Guidance For Every Need</Text>
           <View style={s.healNeedGrid}>
             {[
               { img: advHypnosisImg, label:"CALM YOUR\nMIND",    cat:"Advance Hypnosis" },
@@ -973,44 +1120,69 @@ export default function HomeScreen() {
         </View>
 
         {/* ═══════════════ STARTING SOON (countdown cards) ═══════════════
-             Portrait-style session cards with real-time countdowns. */}
-        {liveHeroSessions.length > 0 && (
-          <View style={[s.section, { paddingHorizontal:0 }]}>
-            <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]}>Starting Soon</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:12, gap:10 }}>
-              {liveHeroSessions.map(item => {
-                const eduObj = typeof item.educator === "object" ? item.educator : null;
-                const eduName = eduObj?.name ?? "BSH Healer";
-                const countdown = fmtCountdown(item.scheduledAt, item.status);
-                const avatar = eduObj?.avatar ? { uri: eduObj.avatar } : slide1;
-                return (
-                  <TouchableOpacity key={item._id} style={s.startSoonCard} activeOpacity={0.88}
-                    onPress={() => router.push("/(tabs)/live" as any)}>
-                    <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                    <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.35)" }} />
-                    {/* Countdown badge top-left */}
-                    <View style={[s.startSoonBadge, { backgroundColor: countdown.bg }]}>
-                      <Text style={s.startSoonBadgeTxt}>{countdown.label}</Text>
-                    </View>
-                    {/* Info at bottom */}
-                    <View style={s.startSoonInfo}>
-                      <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
-                      <Text style={s.startSoonEdu}>{eduName}</Text>
-                      <Text style={s.startSoonDate}>
-                        {new Date(item.scheduledAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
+             Admin-managed upcoming class cards with live countdown timers.
+             Falls back to live sessions if no admin classes are set. */}
+        {(upcomingClasses.length > 0 || liveHeroSessions.length > 0) && (() => {
+          const useAdmin = upcomingClasses.length > 0;
+          return (
+            <View style={[s.section, { paddingHorizontal:0 }]}>
+              <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]} numberOfLines={1}>Starting Soon</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:12, gap:10 }}>
+                {useAdmin
+                  ? upcomingClasses.map(item => {
+                      const countdown = fmtCountdown(item.scheduledAt, item.status);
+                      const src = item.thumbnailUrl ? { uri: item.thumbnailUrl } : slide1;
+                      return (
+                        <TouchableOpacity key={item._id} style={s.startSoonCard} activeOpacity={0.88}
+                          onPress={() => router.push((item.ctaLink || "/(tabs)/live") as any)}>
+                          <Image source={src} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
+                          <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.38)" }} />
+                          <View style={[s.startSoonBadge, { backgroundColor: countdown.bg }]}>
+                            <Text style={s.startSoonBadgeTxt}>{countdown.label}</Text>
+                          </View>
+                          <View style={s.startSoonInfo}>
+                            <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
+                            {item.educatorName ? <Text style={s.startSoonEdu}>{item.educatorName}</Text> : null}
+                            <Text style={s.startSoonDate}>
+                              {new Date(item.scheduledAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  : liveHeroSessions.map(item => {
+                      const eduObj = typeof item.educator === "object" ? item.educator : null;
+                      const eduName = eduObj?.name ?? "BSH Healer";
+                      const countdown = fmtCountdown(item.scheduledAt, item.status);
+                      const avatar = eduObj?.avatar ? { uri: eduObj.avatar } : slide1;
+                      return (
+                        <TouchableOpacity key={item._id} style={s.startSoonCard} activeOpacity={0.88}
+                          onPress={() => router.push("/(tabs)/live" as any)}>
+                          <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
+                          <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.35)" }} />
+                          <View style={[s.startSoonBadge, { backgroundColor: countdown.bg }]}>
+                            <Text style={s.startSoonBadgeTxt}>{countdown.label}</Text>
+                          </View>
+                          <View style={s.startSoonInfo}>
+                            <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
+                            <Text style={s.startSoonEdu}>{eduName}</Text>
+                            <Text style={s.startSoonDate}>
+                              {new Date(item.scheduledAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                }
+              </ScrollView>
+            </View>
+          );
+        })()}
 
         {/* ═══════════════ GET 1:1 EXPERT GUIDANCE TODAY ═══════════════
              Thematic icon tiles linking to consultation categories. */}
         <View style={[s.section, { paddingHorizontal:0 }]}>
-          <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]}>Get 1:1 Expert Guidance Today</Text>
+          <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]} numberOfLines={1}>Get 1:1 Expert Guidance Today</Text>
           <View style={s.guidance1on1Grid}>
             {[
               { img:deepTranceImg,  label:"HYPNO-\nTHERAPY",   spec:"Hypnotherapy" },
@@ -1032,7 +1204,7 @@ export default function HomeScreen() {
 
         {/* ── Select Your Goal (existing programs/courses — kept for navigation) ── */}
         <View style={s.section}>
-          <Text style={[s.sectionTitle, {color:t.text}]}>Select Your Goal</Text>
+          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Select Your Goal</Text>
           <Text style={[s.sectionSub, {color:t.textMuted}]}>
             {apiPrograms.length > 0 ? `${apiPrograms.length} programs · admin-managed` : "20+ subjects for your spiritual journey"}
           </Text>
@@ -1075,7 +1247,7 @@ export default function HomeScreen() {
         {/* ── Most Engaging Classes (API) ── */}
         {featuredClasses.length > 0 && (
           <View style={[s.section, {backgroundColor:t.surface2, borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:18}]}>
-            <Text style={[s.sectionTitle, {color:t.text}]}>Most engaging spiritual classes</Text>
+            <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Most Engaging Spiritual Classes</Text>
             <Text style={[s.sectionSub, {color:t.textMuted}]}>Tap any class to watch the recording</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop:12 }}>
               {featuredClasses.slice(0,8).map(cls=>(
@@ -1110,7 +1282,7 @@ export default function HomeScreen() {
         {/* ── Classes by BSH Subject (API) ── */}
         {homeClasses.length > 0 && allSubjects.length > 0 && (
           <View style={s.section}>
-            <Text style={[s.sectionTitle, {color:t.text}]}>Classes by BSH subjects</Text>
+            <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Classes by BSH Subjects</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop:10, marginBottom:12 }}>
               {allSubjects.map(subj=>{
                 const active = subj===activeSubject;
@@ -1155,7 +1327,7 @@ export default function HomeScreen() {
             <View style={{width:8,height:8,borderRadius:4,backgroundColor:"#a78bfa",marginRight:8}} />
             <Text style={{color:"#a78bfa",fontSize:11,fontWeight:"700",letterSpacing:1}}>ONE-ON-ONE WITH INDIA'S BEST HEALERS</Text>
           </View>
-          <Text style={[s.sectionTitle, {color:t.text}]}>Meet Your Personal Healers</Text>
+          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Meet Your Personal Healers</Text>
           <Text style={[s.sectionSub, {color:t.textMuted, marginBottom:14}]}>Hand-picked masters — each session is 1-on-1, deeply personal</Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1244,7 +1416,7 @@ export default function HomeScreen() {
             </View>
             <View style={{flex:1,minWidth:0}}>
               <View style={{flexDirection:"row",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                <Text style={[s.sectionTitle, {color:t.text}]}>Daily Healing Tools</Text>
+                <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Daily Healing Tools</Text>
                 <View style={{backgroundColor:"#7c3aed",borderRadius:4,paddingHorizontal:6,paddingVertical:2}}>
                   <Text style={{color:"#fff",fontSize:8,fontWeight:"800"}}>BSH</Text>
                 </View>
@@ -1335,7 +1507,7 @@ export default function HomeScreen() {
 
         {/* ── Watch Free Live Classes ── */}
         <View style={[s.section, {backgroundColor: isDark ? "#0c1a14" : "#f0fdf4", borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
-          <Text style={[s.sectionTitle, {color:t.text}]}>Watch free live classes</Text>
+          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Watch Free Live Classes</Text>
           <View style={{flexDirection:"row",gap:12,marginTop:10,marginBottom:16,flexWrap:"wrap"}}>
             {[{icon:"💬",txt:"Chat live with educators"},{icon:"❓",txt:"Interactive Q&A sessions"},{icon:"✓",txt:"Get your doubts cleared"}].map(f=>(
               <View key={f.txt} style={{flexDirection:"row",alignItems:"center",gap:6}}>
@@ -1356,7 +1528,7 @@ export default function HomeScreen() {
 
         {/* ── Platform Features ── */}
         <View style={s.section}>
-          <Text style={[s.sectionTitle, {color:t.text}]}>Why 50,000 students love BSH</Text>
+          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Why 50K+ Students Love BSH</Text>
           {[
             { emoji:"📺", bg: isDark?"#1e1b4b":"#ede9fe", title:"Daily live classes",
               desc:"Chat with educators, ask questions, answer live polls, and get your doubts cleared — all while the class is going on." },
@@ -1375,7 +1547,7 @@ export default function HomeScreen() {
 
         {/* ── India's Top Educators ── */}
         <View style={[s.section, {backgroundColor:t.surface2, borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
-          <Text style={[s.sectionTitle, {color:t.text}]}>India's top educators to learn from</Text>
+          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>India's Top Educators</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:10}}>
             {[{icon:"⭐",txt:"Proven history of results"},{icon:"🔒",txt:"Mentored 1000s of practitioners"},{icon:"⚡",txt:"Unique style of teaching"}].map(p=>(
               <View key={p.txt} style={[s.statPill, {borderColor:t.border,backgroundColor:t.surface, marginRight:8}]}>
@@ -1426,7 +1598,7 @@ export default function HomeScreen() {
         <View style={[s.section, {marginTop:8}]}>
           <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <View>
-              <Text style={[s.sectionTitle, {color:t.text}]}>Popular batches</Text>
+              <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Popular Batches</Text>
               <Text style={[s.sectionSub, {color:t.textMuted}]}>
                 {apiBatches.length > 0 ? "Live from admin · Razorpay enabled" : "Hand-picked by our educators"}
               </Text>
@@ -1435,26 +1607,37 @@ export default function HomeScreen() {
               <Text style={{color:"#7c3aed",fontSize:13,fontWeight:"700"}}>View all →</Text>
             </TouchableOpacity>
           </View>
-          {displayBatches.map(batch=>(
-            <View key={batch.id} style={[s.batchCard, {backgroundColor:t.card, borderColor:t.border}]}>
+          {displayBatches.map(batch=>{
+            const active = batch.isActive !== false;
+            return (
+            <View key={batch.id} style={[s.batchCard, {backgroundColor:t.card, borderColor: active ? t.border : "#111128"}]}>
               <View style={s.batchImgWrapper}>
                 {batch.thumbUrl
-                  ? <Image source={{uri:batch.thumbUrl}} style={s.batchImg} />
-                  : <Image source={batch.img} style={s.batchImg} />}
+                  ? <Image source={{uri:batch.thumbUrl}} style={[s.batchImg, !active && {opacity:0.4}]} />
+                  : <Image source={batch.img} style={[s.batchImg, !active && {opacity:0.4}]} />}
                 <View style={s.batchImgDim} />
-                {batch.status==="ongoing" && (
+                {/* Coming Soon overlay for inactive batches */}
+                {!active && (
+                  <View style={s.batchComingSoonOverlay}>
+                    <View style={s.batchComingSoonPill}>
+                      <Ionicons name="lock-closed" size={11} color="#94a3b8" />
+                      <Text style={s.batchComingSoonPillTxt}>COMING SOON</Text>
+                    </View>
+                  </View>
+                )}
+                {active && (batch.status as string)==="ongoing" && (
                   <View style={s.ongoingBadge}>
                     <View style={s.redDot} />
                     <Text style={s.ongoingTxt}>Live</Text>
                   </View>
                 )}
-                {batch._course && (
+                {active && batch._course && (
                   <View style={{position:"absolute",top:10,right:10,backgroundColor:"rgba(124,58,237,0.9)",borderRadius:8,paddingHorizontal:8,paddingVertical:4}}>
                     <Text style={{color:"#fff",fontSize:9,fontWeight:"800"}}>ADMIN MANAGED</Text>
                   </View>
                 )}
               </View>
-              <View style={s.batchBody}>
+              <View style={[s.batchBody, !active && {opacity:0.5}]}>
                 <View style={{flexDirection:"row",flexWrap:"wrap",gap:6,marginBottom:8}}>
                   {batch.tags.map(tag=>(
                     <View key={tag} style={[s.tag, {backgroundColor:t.surface2, borderColor:t.border}]}>
@@ -1475,37 +1658,46 @@ export default function HomeScreen() {
                     </View>
                   ) : null}
                 </View>
-                <View style={{flexDirection:"row",gap:10}}>
-                  <TouchableOpacity style={[s.buyBtn, {backgroundColor:"#7c3aed"}]}
-                    onPress={()=>{
-                      const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
-                      if (slug) router.push(`/program/${slug}` as any);
-                      else if (batch._course) setBatchModal(batch._course);
-                      else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
-                    }}>
-                    <Text style={s.buyBtnTxt}>Enroll Now</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.detailBtn, {borderColor:t.border}]}
-                    onPress={()=>{
-                      const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
-                      if (slug) router.push(`/program/${slug}` as any);
-                      else if (batch._course) setBatchModal(batch._course);
-                      else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
-                    }}>
-                    <Text style={[s.detailBtnTxt, {color:t.text}]}>View Details</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={{marginTop:10}} onPress={()=>setBookModal("freeCall")}>
-                  <Text style={{color:t.textMuted,fontSize:12}}>Have questions? <Text style={{color:"#7c3aed",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
-                </TouchableOpacity>
+                {active ? (
+                  <>
+                    <View style={{flexDirection:"row",gap:10}}>
+                      <TouchableOpacity style={[s.buyBtn, {backgroundColor:"#7c3aed"}]}
+                        onPress={()=>{
+                          const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
+                          if (slug) router.push(`/program/${slug}` as any);
+                          else if (batch._course) setBatchModal(batch._course);
+                          else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
+                        }}>
+                        <Text style={s.buyBtnTxt}>Enroll Now</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.detailBtn, {borderColor:t.border}]}
+                        onPress={()=>{
+                          const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
+                          if (slug) router.push(`/program/${slug}` as any);
+                          else if (batch._course) setBatchModal(batch._course);
+                          else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
+                        }}>
+                        <Text style={[s.detailBtnTxt, {color:t.text}]}>View Details</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity style={{marginTop:10}} onPress={()=>setBookModal("freeCall")}>
+                      <Text style={{color:t.textMuted,fontSize:12}}>Have questions? <Text style={{color:"#7c3aed",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <View style={s.batchComingSoonBtn}>
+                    <Text style={s.batchComingSoonBtnTxt}>Coming Soon</Text>
+                  </View>
+                )}
               </View>
             </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* ── Testimonials ── */}
         <View style={[s.section, {backgroundColor:t.surface2, borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
-          <Text style={[s.sectionTitle, {color:t.text}]}>What our students say</Text>
+          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>What Our Students Say</Text>
           <Text style={[s.sectionSub, {color:t.textMuted, marginBottom:14}]}>Real experiences from our learners</Text>
           {TESTIMONIALS.map(tm=>(
             <View key={tm.name} style={[s.testimonialCard, {backgroundColor:t.card, borderColor:t.border}]}>
@@ -1563,7 +1755,7 @@ export default function HomeScreen() {
 
       {/* ── Healer Search Dropdown ── */}
       {healerResults.length > 0 && (
-        <View style={{position:"absolute",top:HEADER_H+insets.top,left:0,right:0,zIndex:200,
+        <View style={{position:"absolute",top: SW * 1.1 + insets.top + 50,left:0,right:0,zIndex:200,
           backgroundColor:isDark?"#1e1b4b":"#fff",
           borderBottomLeftRadius:16,borderBottomRightRadius:16,
           shadowColor:"#000",shadowOpacity:0.2,shadowRadius:12,elevation:10,
@@ -1893,6 +2085,115 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* ── Healing Tool Player Modal ── */}
+      <Modal visible={!!healPlayer} transparent animationType="fade" onRequestClose={() => setHealPlayer(null)}>
+        {healPlayer ? (
+          <View style={{ flex:1, backgroundColor:"rgba(4,2,14,0.97)" }}>
+            {/* Ambient orbs */}
+            <Animated.View pointerEvents="none" style={{
+              position:"absolute", width:320, height:320, borderRadius:160,
+              backgroundColor: healPlayer.g1 + "28",
+              top: -60, right: -80,
+              transform:[{ translateY: playerOrb1Y }],
+            }} />
+            <Animated.View pointerEvents="none" style={{
+              position:"absolute", width:260, height:260, borderRadius:130,
+              backgroundColor: healPlayer.g2 + "20",
+              bottom: 80, left: -60,
+              transform:[{ translateY: playerOrb2Y }],
+            }} />
+
+            {/* Close + type badge + play/pause */}
+            <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, flexDirection:"row", justifyContent:"space-between", alignItems:"center" }}>
+              <TouchableOpacity onPress={() => setHealPlayer(null)}
+                style={{ width:38, height:38, borderRadius:19, backgroundColor:"rgba(255,255,255,0.08)", alignItems:"center", justifyContent:"center" }}>
+                <Ionicons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+              <View style={{ paddingHorizontal:14, paddingVertical:6, borderRadius:20, backgroundColor: healPlayer.g1 + "40", borderWidth:1, borderColor: healPlayer.g1 + "60" }}>
+                <Text style={{ color:"#fff", fontSize:11, fontWeight:"800", letterSpacing:1.5 }}>{healPlayer.type}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setPlayerRunning(r => !r)}
+                style={{ width:38, height:38, borderRadius:19, backgroundColor:"rgba(255,255,255,0.08)", alignItems:"center", justifyContent:"center" }}>
+                <Ionicons name={playerRunning ? "pause" : "play"} size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Center: progress ring + icon */}
+            <View style={{ flex:1, alignItems:"center", justifyContent:"center", marginTop: -20 }}>
+              {/* Glow halo */}
+              <Animated.View pointerEvents="none" style={{
+                position:"absolute", width:220, height:220, borderRadius:110,
+                backgroundColor: healPlayer.g1 + "18",
+                transform:[{ scale: playerGlowAnim }],
+              }} />
+
+              {/* SVG progress ring */}
+              <Svg width={210} height={210} style={{ position:"absolute" }}>
+                <Circle cx={105} cy={105} r={PLAYER_CIRC_R} stroke="rgba(255,255,255,0.08)" strokeWidth={6} fill="none" />
+                <Circle
+                  cx={105} cy={105} r={PLAYER_CIRC_R}
+                  stroke={healPlayer.g1}
+                  strokeWidth={6}
+                  fill="none"
+                  strokeDasharray={`${PLAYER_CIRC_C}`}
+                  strokeDashoffset={playerDashOff}
+                  strokeLinecap="round"
+                  rotation={-90}
+                  origin="105,105"
+                />
+              </Svg>
+
+              {/* Icon + timer */}
+              <View style={{ alignItems:"center", justifyContent:"center" }}>
+                <Animated.View style={{ transform:[{ scale: playerGlowAnim }] }}>
+                  <Ionicons name={healPlayer.icon} size={54} color={healPlayer.g1} />
+                </Animated.View>
+                <Text style={{ color:"#fff", fontSize:20, fontWeight:"700", marginTop:14 }}>
+                  {fmtPlayerTime(playerElapsed)}
+                </Text>
+                <Text style={{ color:"rgba(255,255,255,0.35)", fontSize:12, marginTop:2 }}>
+                  / {healPlayer.duration}
+                </Text>
+              </View>
+            </View>
+
+            {/* Title + guidance text */}
+            <View style={{ paddingHorizontal:32, paddingBottom:insets.bottom + 56, alignItems:"center" }}>
+              <Text style={{ color:"#fff", fontSize:22, fontWeight:"800", textAlign:"center", marginBottom:16 }}>
+                {healPlayer.title}
+              </Text>
+
+              {/* Phase guidance card */}
+              <View style={{ backgroundColor:"rgba(255,255,255,0.05)", borderRadius:16, padding:20, borderWidth:1, borderColor: healPlayer.g1 + "30", width:"100%" }}>
+                <View style={{ flexDirection:"row", alignItems:"center", marginBottom:8, gap:6 }}>
+                  <Ionicons name="mic-outline" size={13} color={healPlayer.g1} />
+                  <Text style={{ color: healPlayer.g1, fontSize:10, fontWeight:"700", letterSpacing:1.5, textTransform:"uppercase" }}>
+                    Guidance
+                  </Text>
+                  <Text style={{ color:"rgba(255,255,255,0.25)", fontSize:10, flex:1, textAlign:"right" }}>
+                    {currentPhaseIdx + 1}/{playerPhases.length}
+                  </Text>
+                </View>
+                <Text style={{ color:"rgba(255,255,255,0.82)", fontSize:16, lineHeight:24, textAlign:"center", fontStyle:"italic" }}>
+                  "{currentPhaseText}"
+                </Text>
+              </View>
+
+              {/* Phase dots */}
+              <View style={{ flexDirection:"row", gap:6, marginTop:16 }}>
+                {playerPhases.map((_, i) => (
+                  <View key={i} style={{
+                    width: i === currentPhaseIdx ? 18 : 6,
+                    height:6, borderRadius:3,
+                    backgroundColor: i <= currentPhaseIdx ? healPlayer.g1 : "rgba(255,255,255,0.18)",
+                  }} />
+                ))}
+              </View>
+            </View>
+          </View>
+        ) : null}
+      </Modal>
+
       {/* ── Breathing Modal ── */}
       <Modal visible={breathModalOpen} transparent animationType="fade" onRequestClose={()=>setBreathModalOpen(false)}>
         <View style={s.modalOverlay}>
@@ -1974,45 +2275,87 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
   return StyleSheet.create({
     root: { flex:1 },
 
-    // Header
+    // ── Floating header — fully transparent over hero ────────────────────────
     headerWrapper: {
-      paddingHorizontal:16, paddingBottom:14,
+      paddingHorizontal:16, paddingBottom:10,
       position:"absolute", top:0, left:0, right:0, zIndex:100,
-      elevation:10, shadowColor:"#000", shadowOpacity:0.35, shadowRadius:14, shadowOffset:{width:0,height:6},
     },
-    headerRow: { flexDirection:"row", justifyContent:"space-between", alignItems:"center", paddingTop:10, marginBottom:14 },
-    headerLogo: { width:36, height:36, marginRight:8, borderRadius:8 },
-    brandArea: { flex:1, marginRight:6 },
-    brandName: { color:"#fff", fontSize:20, fontWeight:"900", letterSpacing:0.5 },
-    brandSub: { color:"rgba(255,255,255,0.65)", fontSize:11, fontWeight:"500" },
-    headerActions: { flexDirection:"row", alignItems:"center", gap:6 },
-    liveBtn: { flexDirection:"row", alignItems:"center", gap:4, backgroundColor:"rgba(239,68,68,0.18)", borderRadius:14, paddingHorizontal:8, paddingVertical:5, borderWidth:1, borderColor:"rgba(239,68,68,0.4)" },
-    liveDot: { width:6, height:6, borderRadius:3, backgroundColor:"#ef4444" },
-    liveTxt: { color:"#ef4444", fontSize:11, fontWeight:"700" },
-    consultBtn: { backgroundColor:"rgba(255,255,255,0.2)", borderRadius:14, paddingHorizontal:8, paddingVertical:5, borderWidth:1, borderColor:"rgba(255,255,255,0.3)" },
-    consultTxt: { fontSize:14 },
-    themeBtn: { backgroundColor:"rgba(255,255,255,0.15)", borderRadius:14, width:30, height:30, alignItems:"center", justifyContent:"center" },
-    avatar: { width:32, height:32, borderRadius:16, borderWidth:2, borderColor:"rgba(255,255,255,0.5)" },
-    avatarDefault: { width:32, height:32, borderRadius:16, backgroundColor:"rgba(255,255,255,0.2)", alignItems:"center", justifyContent:"center", borderWidth:2, borderColor:"rgba(255,255,255,0.5)" },
-    avatarInitial: { color:"#fff", fontWeight:"800", fontSize:13 },
-    searchBar: { flexDirection:"row", alignItems:"center", gap:8, borderRadius:10, paddingHorizontal:12, paddingVertical:9, shadowColor:"#000", shadowOpacity:0.08, shadowRadius:4, elevation:2 },
-    searchIcon: { fontSize:15 },
-    searchPlaceholder: { fontSize:13, flex:1 },
+    headerRow: { flexDirection:"row", justifyContent:"space-between", alignItems:"center", paddingTop:8 },
+    headerLogo: { width:34, height:34, borderRadius:8 },
+    brandName: { color:"#fff", fontSize:19, fontWeight:"900", letterSpacing:0.4,
+      textShadowColor:"rgba(0,0,0,0.6)", textShadowOffset:{width:0,height:1}, textShadowRadius:4 },
+    brandSub: { color:"rgba(255,255,255,0.75)", fontSize:10, fontWeight:"500" },
+    headerActions: { flexDirection:"row", alignItems:"center", gap:10 },
+
+    // Live pill — only button that keeps its background (it's a feature indicator)
+    liveBtn: {
+      flexDirection:"row", alignItems:"center", gap:5,
+      backgroundColor:"rgba(220,38,38,0.22)", borderRadius:20,
+      paddingHorizontal:11, paddingVertical:6,
+      borderWidth:1.5, borderColor:"rgba(255,80,80,0.5)",
+    },
+    liveDot: { width:6, height:6, borderRadius:3, backgroundColor:"#ff4444",
+      shadowColor:"#ff4444", shadowOpacity:1, shadowRadius:4 },
+    liveTxt: { color:"#fff", fontSize:11, fontWeight:"900", letterSpacing:0.3,
+      textShadowColor:"rgba(0,0,0,0.5)", textShadowOffset:{width:0,height:1}, textShadowRadius:3 },
+
+    // Chat, theme, avatar — fully transparent, white icons with text shadow
+    consultBtn: { padding:4, position:"relative" },
+    consultTxt: { fontSize:20,
+      textShadowColor:"rgba(0,0,0,0.7)", textShadowOffset:{width:0,height:1}, textShadowRadius:6 },
+    themeBtn: { padding:4, alignItems:"center", justifyContent:"center" },
+    avatar: { width:34, height:34, borderRadius:17, borderWidth:2, borderColor:"rgba(255,255,255,0.8)",
+      shadowColor:"#000", shadowOpacity:0.4, shadowRadius:6 },
+    avatarDefault: {
+      width:34, height:34, borderRadius:17,
+      backgroundColor:"rgba(124,58,237,0.55)", alignItems:"center", justifyContent:"center",
+      borderWidth:2, borderColor:"rgba(255,255,255,0.7)",
+      shadowColor:"#000", shadowOpacity:0.5, shadowRadius:6,
+    },
+    avatarInitial: { color:"#fff", fontWeight:"900", fontSize:14 },
+
+    // Floating search pill — overlaps the hero's bottom edge
+    floatingSearchWrap: { marginTop:-26, marginHorizontal:14, zIndex:50 },
+    floatingSearch: {
+      flexDirection:"row", alignItems:"center", gap:10,
+      borderRadius:50, paddingHorizontal:18, paddingVertical:13,
+      shadowColor:"#000", shadowOpacity:0.28, shadowRadius:20,
+      shadowOffset:{width:0,height:8}, elevation:14,
+    },
+    searchIcon: { fontSize:16 },
+    searchPlaceholder: { fontSize:14, flex:1 },
 
     // ── Hero live-session carousel ──────────────────────────────────────────
-    heroMuteBtn: { position:"absolute", top:14, right:14, width:36, height:36, borderRadius:18, backgroundColor:"rgba(0,0,0,0.55)", alignItems:"center", justifyContent:"center", zIndex:10 },
-    heroOverlay: { position:"absolute", bottom:0, left:0, right:0, padding:20, paddingBottom:44 },
-    heroSuperTitle: { color:"rgba(255,255,255,0.7)", fontSize:11, fontWeight:"800", letterSpacing:1.2, marginBottom:2 },
-    heroEducatorName: { color:"#fff", fontSize:14, fontWeight:"900", letterSpacing:0.6, marginTop:4 },
-    heroSessionTitle: { color:"#fff", fontSize:20, fontWeight:"900", lineHeight:26, marginTop:4, marginBottom:10 },
-    heroCountdownBadge: { alignSelf:"flex-start", borderRadius:20, paddingHorizontal:14, paddingVertical:6, marginBottom:12 },
-    heroCountdownTxt: { color:"#fff", fontSize:12, fontWeight:"900", letterSpacing:0.5 },
-    heroAttendeeRow: { flexDirection:"row", alignItems:"center", height:24 },
-    heroAvatarThumb: { position:"absolute", width:24, height:24, borderRadius:12, borderWidth:2, borderColor:"#1e1b4b", alignItems:"center", justifyContent:"center" },
+    heroMuteBtn: { position:"absolute", top:14, right:14, width:36, height:36, borderRadius:18, backgroundColor:"rgba(0,0,0,0.38)", alignItems:"center", justifyContent:"center", zIndex:10,
+      borderWidth:1, borderColor:"rgba(255,255,255,0.18)" },
+    heroOverlay: { position:"absolute", bottom:0, left:0, right:0, paddingHorizontal:24, paddingBottom:52, alignItems:"center" },
+    // Hero text — no background, centred, let image show through
+    heroSuperTitle: {
+      color:"rgba(255,255,255,0.6)", fontSize:9, fontWeight:"700",
+      letterSpacing:2.5, marginBottom:6, textTransform:"uppercase", textAlign:"center",
+      textShadowColor:"rgba(0,0,0,0.6)", textShadowOffset:{width:0,height:1}, textShadowRadius:4,
+    },
+    heroEducatorName: {
+      color:"rgba(255,255,255,0.88)", fontSize:12, fontWeight:"700",
+      letterSpacing:2, marginBottom:8, textTransform:"uppercase", textAlign:"center",
+      textShadowColor:"rgba(0,0,0,0.6)", textShadowOffset:{width:0,height:1}, textShadowRadius:4,
+    },
+    heroSessionTitle: {
+      color:"#fff", fontSize:22, fontWeight:"800", lineHeight:29, marginBottom:14,
+      textAlign:"center",
+      textShadowColor:"rgba(0,0,0,0.55)", textShadowOffset:{width:0,height:2}, textShadowRadius:10,
+    },
+    heroCountdownBadge: {
+      alignSelf:"center", borderRadius:24,
+      paddingHorizontal:18, paddingVertical:8, marginBottom:14,
+    },
+    heroCountdownTxt: { color:"#fff", fontSize:12, fontWeight:"900", letterSpacing:1 },
+    heroAttendeeRow: { flexDirection:"row", alignItems:"center", height:26, justifyContent:"center" },
+    heroAvatarThumb: { position:"absolute", width:24, height:24, borderRadius:12, borderWidth:2, borderColor:"rgba(0,0,0,0.5)", alignItems:"center", justifyContent:"center" },
     heroAttendeeTxt: { color:"rgba(255,255,255,0.8)", fontSize:12, fontWeight:"600" },
     heroDotsRow: { position:"absolute", bottom:20, left:0, right:0, flexDirection:"row", justifyContent:"center", gap:6 },
-    heroDot: { width:6, height:6, borderRadius:3, backgroundColor:"rgba(255,255,255,0.35)" },
-    heroDotActive: { width:18, backgroundColor:"#fff" },
+    heroDot: { width:20, height:3, borderRadius:2, backgroundColor:"rgba(255,255,255,0.3)" },
+    heroDotActive: { width:34, height:3, borderRadius:2, backgroundColor:"#fff" },
 
     // ── "Spiritual Guidance For Every Need" 2×3 photo goal grid ─────────────
     healNeedGrid: { flexDirection:"row", flexWrap:"wrap", paddingHorizontal:10, gap:6, marginTop:14 },
@@ -2053,8 +2396,8 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
 
     // Section commons
     section: { paddingHorizontal:16, paddingTop:20, paddingBottom:8 },
-    sectionTitle: { fontSize:20, fontWeight:"800", letterSpacing:-0.3 },
-    sectionSub: { fontSize:13, marginTop:2 },
+    sectionTitle: { fontSize:15, fontWeight:"700", letterSpacing:0.7 },
+    sectionSub: { fontSize:12, marginTop:3, letterSpacing:0.2 },
     seeAllBtn: { marginTop:12, alignSelf:"flex-start", paddingHorizontal:14, paddingVertical:8, borderRadius:10, borderWidth:1.5 },
     seeAllBtnTxt: { fontSize:13, fontWeight:"600" },
 
@@ -2159,6 +2502,11 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     batchImgWrapper: { height:140, position:"relative" },
     batchImg: { width:"100%", height:"100%", resizeMode:"cover" },
     batchImgDim: { ...StyleSheet.absoluteFillObject, backgroundColor:"rgba(0,0,0,0.3)" },
+    batchComingSoonOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor:"rgba(5,4,18,0.55)", alignItems:"center", justifyContent:"center" },
+    batchComingSoonPill: { flexDirection:"row", alignItems:"center", gap:5, backgroundColor:"rgba(15,14,38,0.85)", borderRadius:20, paddingHorizontal:14, paddingVertical:6, borderWidth:1, borderColor:"#334155" },
+    batchComingSoonPillTxt: { color:"#94a3b8", fontSize:11, fontWeight:"800", letterSpacing:1 },
+    batchComingSoonBtn: { backgroundColor:"#1a1932", borderRadius:12, paddingVertical:11, alignItems:"center", borderWidth:1, borderColor:"#2d2b52" },
+    batchComingSoonBtnTxt: { color:"#4b5563", fontSize:13, fontWeight:"700" },
     ongoingBadge: { position:"absolute", top:10, left:10, flexDirection:"row", alignItems:"center", gap:5, backgroundColor:"rgba(0,0,0,0.7)", borderRadius:10, paddingHorizontal:8, paddingVertical:4 },
     redDot: { width:6, height:6, borderRadius:3, backgroundColor:"#ef4444" },
     ongoingTxt: { color:"#fff", fontSize:10, fontWeight:"700" },

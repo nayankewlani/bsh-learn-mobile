@@ -23,78 +23,88 @@ const bshLogoImg      = require("../../assets/BSH-logo-02.png");
 
 const CATEGORIES = ["All", "Books", "Courses", "Merch", "Tools", "Combos"];
 
+// isActive = false → dark "Starting Soon" overlay; no purchase action
 const PRODUCTS = [
   {
-    id: "p1", category: "Courses",
+    id: "p1", category: "Courses", isActive: true,
     title: "Advance Hypnosis Master Course",
     desc: "Complete A–Z hypnosis certification with live Q&A sessions.",
-    img: advHypnosisImg, price: 3999, originalPrice: 5999,
+    img: advHypnosisImg, price: 29999, originalPrice: 34999,
     badge: "BESTSELLER", badgeColor: "#f59e0b",
-    tag: "Digital Course",
+    tag: "Certification",
+    slug: "advance-hypnosis",
   },
   {
-    id: "p2", category: "Courses",
+    id: "p2", category: "Courses", isActive: false,
     title: "Art of Shadow Work",
     desc: "Deep inner healing — heal suppressed emotions permanently.",
     img: shadowWorkImg, price: 2499, originalPrice: 3999,
     badge: "TOP RATED", badgeColor: "#7c3aed",
     tag: "Digital Course",
+    slug: "",
   },
   {
-    id: "p3", category: "Courses",
+    id: "p3", category: "Courses", isActive: false,
     title: "Akashik Records Access",
     desc: "Learn to access universal knowledge and soul blueprint.",
     img: akashicImg, price: 2999, originalPrice: 4999,
     badge: null, badgeColor: "",
     tag: "Digital Course",
+    slug: "",
   },
   {
-    id: "p4", category: "Courses",
-    title: "Reiki Certification Level 1 & 2",
+    id: "p4", category: "Courses", isActive: false,
+    title: "Reiki Level 1 & 2",
     desc: "Universal life energy healing — beginner to practitioner.",
     img: reikiImg, price: 1999, originalPrice: 3000,
     badge: "NEW", badgeColor: "#059669",
-    tag: "Certification",
+    tag: "Workshop",
+    slug: "",
   },
   {
-    id: "p5", category: "Courses",
+    id: "p5", category: "Courses", isActive: true,
     title: "Hypnosis 2.0 — Upgrade Your Mind",
     desc: "Advanced techniques beyond beginner hypnosis.",
     img: hypnosis2Img, price: 2999, originalPrice: 4500,
     badge: null, badgeColor: "",
     tag: "Digital Course",
+    slug: "hypnosis-2",
   },
   {
-    id: "p6", category: "Courses",
+    id: "p6", category: "Courses", isActive: false,
     title: "Mesmerism & Energy Mastery",
     desc: "Ancient art of magnetism and personal influence.",
     img: mesmerismImg, price: 1999, originalPrice: 3500,
     badge: null, badgeColor: "",
     tag: "Workshop",
+    slug: "",
   },
   {
-    id: "p7", category: "Courses",
+    id: "p7", category: "Courses", isActive: false,
     title: "Past Life Regression Therapy",
     desc: "Journey into past lives to heal present-day blocks.",
     img: pastLifeImg, price: 2499, originalPrice: 3999,
     badge: "POPULAR", badgeColor: "#7c3aed",
     tag: "Therapy Course",
+    slug: "",
   },
   {
-    id: "p8", category: "Combos",
+    id: "p8", category: "Combos", isActive: false,
     title: "BSH Complete Healing Bundle",
     desc: "All 8 flagship courses — hypnosis, reiki, shadow work & more.",
     img: deepTranceImg, price: 9999, originalPrice: 24000,
     badge: "SAVE 58%", badgeColor: "#ef4444",
     tag: "Bundle",
+    slug: "",
   },
   {
-    id: "p9", category: "Tools",
+    id: "p9", category: "Tools", isActive: false,
     title: "BSH Plus Membership",
     desc: "Access all 20 healing tools, guided meditations & live sessions.",
     img: bshLogoImg, price: 999, originalPrice: 1999,
     badge: "MONTHLY", badgeColor: "#0d9488",
     tag: "Subscription",
+    slug: "",
   },
 ];
 
@@ -133,6 +143,8 @@ export default function StoreScreen() {
     : PRODUCTS.filter(p => p.category === activeCategory);
 
   const handleBuy = (product: typeof PRODUCTS[0]) => {
+    if (!product.isActive) return;
+    if (product.slug) { router.push(`/program/${product.slug}` as any); return; }
     Alert.alert(
       "Add to Cart",
       `Add "${product.title}" for ₹${product.price.toLocaleString()}?`,
@@ -222,13 +234,19 @@ export default function StoreScreen() {
         {filtered.map((product, idx) => {
           const discount = Math.round((1 - product.price / product.originalPrice) * 100);
           const isRightCol = idx % 2 === 1;
+          const active = product.isActive;
           return (
-            <View key={product.id} style={[styles.card, isRightCol && { marginRight: 0 }]}>
+            <TouchableOpacity
+              key={product.id}
+              style={[styles.card, isRightCol && { marginRight: 0 }]}
+              onPress={() => handleBuy(product)}
+              activeOpacity={active ? 0.85 : 1}
+            >
               {/* Image */}
               <View style={styles.cardImgWrapper}>
-                <Image source={product.img} style={styles.cardImg} />
+                <Image source={product.img} style={[styles.cardImg, !active && { opacity: 0.45 }]} />
                 <View style={styles.cardImgDim} />
-                {product.badge && (
+                {active && product.badge && (
                   <View style={[styles.cardBadge, { backgroundColor: product.badgeColor }]}>
                     <Text style={styles.cardBadgeTxt}>{product.badge}</Text>
                   </View>
@@ -239,10 +257,9 @@ export default function StoreScreen() {
               </View>
 
               {/* Body */}
-              <View style={styles.cardBody}>
+              <View style={[styles.cardBody, !active && { opacity: 0.45 }]}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{product.title}</Text>
                 <Text style={styles.cardDesc} numberOfLines={2}>{product.desc}</Text>
-
                 <View style={styles.priceRow}>
                   <Text style={styles.price}>₹{product.price.toLocaleString()}</Text>
                   <Text style={styles.originalPrice}>₹{product.originalPrice.toLocaleString()}</Text>
@@ -250,12 +267,30 @@ export default function StoreScreen() {
                     <Text style={styles.discountTxt}>{discount}% OFF</Text>
                   </View>
                 </View>
-
-                <TouchableOpacity style={styles.buyBtn} onPress={() => handleBuy(product)} activeOpacity={0.85}>
-                  <Text style={styles.buyBtnTxt}>Add to Cart</Text>
-                </TouchableOpacity>
               </View>
-            </View>
+
+              {/* Starting Soon overlay for inactive courses */}
+              {!active && (
+                <View style={styles.startingSoonOverlay}>
+                  <View style={styles.startingSoonBadge}>
+                    <Text style={styles.startingSoonTxt}>STARTING SOON</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Action button pinned at bottom */}
+              <View style={styles.cardFooter}>
+                {active ? (
+                  <View style={styles.buyBtn}>
+                    <Text style={styles.buyBtnTxt}>Enroll Now</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.buyBtn, styles.comingSoonBtn]}>
+                    <Text style={[styles.buyBtnTxt, { color: "#6b7280" }]}>Coming Soon</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           );
         })}
         </View>
@@ -356,7 +391,7 @@ const styles = StyleSheet.create({
   },
   cardTagTxt: { color: "#e5e7eb", fontSize: 9, fontWeight: "600" },
 
-  cardBody: { padding: 10 },
+  cardBody: { padding: 10, paddingBottom: 4 },
   cardTitle: { color: COLORS.text, fontSize: 12, fontWeight: "800", lineHeight: 17, marginBottom: 4 },
   cardDesc: { color: COLORS.textMuted, fontSize: 10, lineHeight: 14, marginBottom: 10 },
 
@@ -366,9 +401,26 @@ const styles = StyleSheet.create({
   discountBadge: { backgroundColor: "#065f46", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
   discountTxt: { color: "#34d399", fontSize: 9, fontWeight: "800" },
 
+  cardFooter: { paddingHorizontal: 10, paddingBottom: 10 },
   buyBtn: {
     backgroundColor: COLORS.primary, borderRadius: 8,
     paddingVertical: 9, alignItems: "center",
   },
+  comingSoonBtn: { backgroundColor: "#1f1f35", borderWidth: 1, borderColor: "#2d2b52" },
   buyBtnTxt: { color: "#fff", fontSize: 12, fontWeight: "800" },
+
+  startingSoonOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: "center", justifyContent: "center",
+    zIndex: 10,
+  },
+  startingSoonBadge: {
+    backgroundColor: "rgba(10,6,30,0.82)",
+    borderRadius: 8, borderWidth: 1, borderColor: "rgba(124,58,237,0.5)",
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  startingSoonTxt: {
+    color: "#a78bfa", fontSize: 10, fontWeight: "900",
+    letterSpacing: 1.5,
+  },
 });

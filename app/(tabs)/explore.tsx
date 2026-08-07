@@ -37,7 +37,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 // ── Static flagship programs (fallback) ─────────────────────────────────────
 const STATIC_PROGRAMS = [
   {
-    programId: "advance-hypnosis",
+    programId: "advance-hypnosis", isActive: true,
     title: "Advance Hypnosis",
     description: "India's most comprehensive 6-month advanced hypnosis certification program. Covers self-hypnosis, hetero hypnosis, street, stage, Ericksonian & more.",
     level: "Beginner",
@@ -47,7 +47,7 @@ const STATIC_PROGRAMS = [
     img: advHypnosisImg,
   },
   {
-    programId: "hypnosis-2",
+    programId: "hypnosis-2", isActive: true,
     title: "Hypnosis 2.0",
     description: "Subscription-based hypnosis mastery program with live classes and a growing recordings library. Monthly access to 40+ expert-led sessions.",
     level: "Beginner",
@@ -57,7 +57,7 @@ const STATIC_PROGRAMS = [
     img: hypnosis2Img,
   },
   {
-    programId: "healing-tools",
+    programId: "healing-tools", isActive: true,
     title: "BSH Healing Tools — Full Access",
     description: "Unlock all 16 premium healing tools: sleep hypnosis, inner child healing, chakra balancing, fear release, and more. One-time lifetime access.",
     level: "Beginner",
@@ -73,6 +73,13 @@ const PROG_LABEL_COLOR: Record<string, string> = {
   Subscription:  "#0d9488",
   "Tool Pack":   "#d97706",
   default:       "#1d4ed8",
+};
+
+// Always use bundled images for these programs — API thumbnails may be stale/expired
+const FLAGSHIP_IMG: Record<string, any> = {
+  "advance-hypnosis": advHypnosisImg,
+  "hypnosis-2":       hypnosis2Img,
+  "healing-tools":    reikiImg,
 };
 
 // ── Category data ────────────────────────────────────────────────────────────
@@ -231,13 +238,10 @@ export default function ExploreScreen() {
         <View style={styles.flagshipSection}>
           <View style={styles.flagshipHeader}>
             <Text style={styles.flagshipTitle}>Flagship Programs</Text>
-            <View style={styles.certifiedBadge}>
-              <Text style={styles.certifiedTxt}>BSH Healers Certified</Text>
-            </View>
           </View>
 
           {(apiPrograms.length > 0 ? apiPrograms : STATIC_PROGRAMS).map((prog: any) => {
-            const typeLabel = prog.programType || "Certification";
+            const typeLabel = prog.programType || "Course";
             const labelColor = PROG_LABEL_COLOR[typeLabel] ?? PROG_LABEL_COLOR.default;
             const priceRs = prog.discountPrice > 0
               ? Math.round(prog.discountPrice / 100)
@@ -245,39 +249,63 @@ export default function ExploreScreen() {
             const priceStr = typeLabel === "Subscription"
               ? `₹${priceRs}/mo`
               : `₹${priceRs.toLocaleString("en-IN")}`;
-            const localImg = prog.img ?? advHypnosisImg;
+            const localImg = FLAGSHIP_IMG[prog.programId] ?? prog.img ?? advHypnosisImg;
             const slug = prog.programId;
+            const active = prog.isActive !== false; // API programs are always active
 
             return (
-              <TouchableOpacity key={prog.programId ?? prog._id} activeOpacity={0.9}
+              <TouchableOpacity key={prog.programId ?? prog._id}
+                activeOpacity={active ? 0.9 : 1}
                 style={styles.flagshipCard}
-                onPress={() => router.push(`/program/${slug}` as any)}>
-                {/* Type badge */}
-                <View style={[styles.flagshipTypeBadge, { backgroundColor: labelColor }]}>
-                  <Text style={styles.flagshipTypeTxt}>{typeLabel}</Text>
-                </View>
-                {/* Image */}
+                onPress={() => active && router.push(`/program/${slug}` as any)}>
+
+                {/* Type badge — only shown for Certification (Advance Hypnosis) */}
+                {prog.programType === "Certification" && (
+                  <View style={[styles.flagshipTypeBadge, { backgroundColor: labelColor, opacity: active ? 1 : 0.4 }]}>
+                    <Text style={styles.flagshipTypeTxt}>Certification</Text>
+                  </View>
+                )}
+
+                {/* Image — prefer bundled asset for known programs to avoid stale API URLs */}
                 <View style={styles.flagshipImgBox}>
-                  {prog.thumbnail
-                    ? <Image source={{ uri: prog.thumbnail }} style={styles.flagshipImg} resizeMode="cover" />
-                    : <Image source={localImg} style={styles.flagshipImg} resizeMode="cover" />}
+                  <Image source={localImg} style={[styles.flagshipImg, !active && { opacity: 0.4 }]} resizeMode="cover" />
                   <View style={styles.flagshipImgDim} />
-                </View>
-                {/* Info */}
-                <View style={styles.flagshipInfo}>
-                  {prog.level && (
-                    <View style={styles.levelBadge}>
-                      <Text style={styles.levelTxt}>{prog.level}</Text>
+                  {/* Starting Soon badge over image */}
+                  {!active && (
+                    <View style={styles.flagshipStartingSoonBox}>
+                      <Text style={styles.flagshipStartingSoonTxt}>STARTING SOON</Text>
                     </View>
                   )}
+                </View>
+
+                {/* Info */}
+                <View style={[styles.flagshipInfo, !active && { opacity: 0.45 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    {prog.level && (
+                      <View style={styles.levelBadge}>
+                        <Text style={styles.levelTxt}>{prog.level}</Text>
+                      </View>
+                    )}
+                    {prog.programId === "advance-hypnosis" && (
+                      <View style={styles.certifiedBadge}>
+                        <Text style={styles.certifiedTxt}>BSH Healers Certified</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.flagshipName}>{prog.title}</Text>
                   <Text style={styles.flagshipDesc} numberOfLines={2}>{prog.description}</Text>
                   <View style={styles.flagshipPriceRow}>
                     <Text style={styles.flagshipPrice}>{priceStr}</Text>
-                    <TouchableOpacity style={styles.viewProgramBtn}
-                      onPress={() => router.push(`/program/${slug}` as any)}>
-                      <Text style={styles.viewProgramTxt}>View Program</Text>
-                    </TouchableOpacity>
+                    {active ? (
+                      <TouchableOpacity style={styles.viewProgramBtn}
+                        onPress={() => router.push(`/program/${slug}` as any)}>
+                        <Text style={styles.viewProgramTxt}>View Program</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.viewProgramBtn, { backgroundColor: "#1f1f35", borderColor: "#2d2b52" }]}>
+                        <Text style={[styles.viewProgramTxt, { color: "#4b5563" }]}>Coming Soon</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>
@@ -384,28 +412,35 @@ export default function ExploreScreen() {
 // ── Rich Course Card ──────────────────────────────────────────────────────────
 function StaticCourseCard({ course }: { course: StaticCourse }) {
   return (
-    <View style={cardStyles.card}>
+    <View style={[cardStyles.card, cardStyles.cardDimmed]}>
       {/* Image */}
       <View style={cardStyles.imgWrapper}>
-        <Image source={course.img} style={cardStyles.img} resizeMode="cover" />
+        <Image source={course.img} style={[cardStyles.img, { opacity: 0.45 }]} resizeMode="cover" />
         <View style={cardStyles.imgDim} />
+        {/* Dark overlay for coming soon */}
+        <View style={cardStyles.comingSoonOverlay}>
+          <View style={cardStyles.comingSoonPill}>
+            <Ionicons name="lock-closed" size={11} color="#94a3b8" />
+            <Text style={cardStyles.comingSoonPillTxt}>COMING SOON</Text>
+          </View>
+        </View>
         {/* Status badge */}
-        <View style={[cardStyles.statusBadge, course.status === "ongoing" ? cardStyles.statusLive : cardStyles.statusUpcoming]}>
+        <View style={[cardStyles.statusBadge, course.status === "ongoing" ? cardStyles.statusLive : cardStyles.statusUpcoming, { opacity: 0.5 }]}>
           {course.status === "ongoing" && <View style={cardStyles.liveDot} />}
           <Text style={cardStyles.statusTxt}>{course.status === "ongoing" ? "LIVE" : "UPCOMING"}</Text>
         </View>
         {/* Tags */}
         <View style={cardStyles.tagRow}>
           {course.tags.map(t => (
-            <View key={t} style={cardStyles.tag}>
+            <View key={t} style={[cardStyles.tag, { opacity: 0.5 }]}>
               <Text style={cardStyles.tagTxt}>{t}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      {/* Body */}
-      <View style={cardStyles.body}>
+      {/* Body — dimmed */}
+      <View style={[cardStyles.body, { opacity: 0.5 }]}>
         <Text style={cardStyles.title} numberOfLines={2}>{course.title}</Text>
 
         {/* Educator */}
@@ -440,7 +475,7 @@ function StaticCourseCard({ course }: { course: StaticCourse }) {
 
         <View style={cardStyles.divider} />
 
-        {/* Price + CTA */}
+        {/* Price + disabled CTA */}
         <View style={cardStyles.priceRow}>
           <View>
             <Text style={cardStyles.price}>{course.price}<Text style={cardStyles.perMo}>/mo</Text></Text>
@@ -449,16 +484,9 @@ function StaticCourseCard({ course }: { course: StaticCourse }) {
           <View style={cardStyles.saveBadge}>
             <Text style={cardStyles.saveTxt}>SAVE {course.saving}</Text>
           </View>
-          <TouchableOpacity style={cardStyles.enrollBtn}
-            onPress={() => {
-              const slug = course.category === "Advance Hypnosis" ? "advance-hypnosis"
-                : course.category === "Hypnosis 2.0" ? "hypnosis-2" : null;
-              if (slug) router.push(`/program/${slug}` as any);
-              else router.push({ pathname: "/(tabs)/explore", params: { category: course.category } });
-            }}>
-            <Text style={cardStyles.enrollTxt}>Enroll Now</Text>
-            <Ionicons name="arrow-forward" size={14} color="#fff" />
-          </TouchableOpacity>
+          <View style={cardStyles.comingSoonBtn}>
+            <Text style={cardStyles.comingSoonBtnTxt}>Coming Soon</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -517,6 +545,17 @@ const styles = StyleSheet.create({
   flagshipImgBox: { height: 200, position: "relative" },
   flagshipImg: { width: "100%", height: "100%" },
   flagshipImgDim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)" },
+  flagshipStartingSoonBox: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(6,3,20,0.55)",
+  },
+  flagshipStartingSoonTxt: {
+    color: "#a78bfa", fontSize: 16, fontWeight: "900", letterSpacing: 2,
+    borderWidth: 1.5, borderColor: "rgba(124,58,237,0.6)",
+    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: "rgba(10,6,30,0.85)",
+  },
   flagshipInfo: { padding: 16 },
   levelBadge: {
     alignSelf: "flex-start", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
@@ -647,4 +686,25 @@ const cardStyles = StyleSheet.create({
     backgroundColor: "#7c3aed", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
   },
   enrollTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
+
+  // Coming soon card overrides
+  cardDimmed: { borderColor: "#111128" },
+  comingSoonOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(5,4,18,0.55)",
+    alignItems: "center", justifyContent: "center",
+  },
+  comingSoonPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(15,14,38,0.85)", borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderWidth: 1, borderColor: "#334155",
+  },
+  comingSoonPillTxt: { color: "#94a3b8", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  comingSoonBtn: {
+    backgroundColor: "#1a1932", borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderWidth: 1, borderColor: "#2d2b52",
+  },
+  comingSoonBtnTxt: { color: "#4b5563", fontSize: 13, fontWeight: "700" },
 });

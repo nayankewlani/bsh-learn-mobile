@@ -7,8 +7,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuthStore } from "../../stores/authStore";
-import { useThemeStore } from "../../stores/themeStore";
+import { useAuthStore, User } from "../../stores/authStore";
+import { useThemeStore, ThemeColors } from "../../stores/themeStore";
 import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
 import client from "../../api/client";
 
@@ -47,8 +47,8 @@ interface ChatMsg { _id: string; sender: { _id: string; name: string; role: stri
 
 // ── Apply 1:1 Modal ───────────────────────────────────────────────────────────
 const ApplyModal: React.FC<{
-  expert: Expert; t: ReturnType<typeof useThemeStore>["t"];
-  user: ReturnType<typeof useAuthStore>["user"]; onClose: ()=>void;
+  expert: Expert; t: ThemeColors;
+  user: User | null; onClose: ()=>void;
 }> = ({ expert, t, user, onClose }) => {
   const [name, setName]   = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
@@ -143,8 +143,8 @@ const ApplyModal: React.FC<{
 
 // ── Live Chat Modal (real two-way chat, mirrors web ChatPanel) ───────────────
 const LiveChatModal: React.FC<{
-  expert: Expert; t: ReturnType<typeof useThemeStore>["t"];
-  user: ReturnType<typeof useAuthStore>["user"]; onClose: ()=>void;
+  expert: Expert; t: ThemeColors;
+  user: User | null; onClose: ()=>void;
 }> = ({ expert, t, user, onClose }) => {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [text, setText]         = useState("");
@@ -336,7 +336,7 @@ const FilterModal: React.FC<{
 
 // ── Expert Card ───────────────────────────────────────────────────────────────
 const ExpertCard: React.FC<{
-  expert: Expert; t: ReturnType<typeof useThemeStore>["t"]; isDark: boolean;
+  expert: Expert; t: ThemeColors; isDark: boolean;
   onApply: ()=>void; onChat: ()=>void; onBook: ()=>void;
 }> = ({ expert, t, isDark, onApply, onChat, onBook }) => {
   const stars = Math.round(expert.rating);

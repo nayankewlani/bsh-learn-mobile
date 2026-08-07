@@ -16,7 +16,7 @@ const mesmerismImg   = require("../assets/mesmerism.png");
 const pastLifeImg    = require("../assets/past-life-regression.png");
 
 const PROG_DATA: Record<string, {
-  img: ReturnType<typeof require>;
+  img: number;
   tagline: string;
   desc: string;
   features: string[];

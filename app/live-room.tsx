@@ -6,15 +6,37 @@ import {
 import { router, useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RtcSurfaceView } from "react-native-agora";
 import { useAuthStore } from "../stores/authStore";
 import client from "../api/client";
 import Whiteboard, { WbStroke } from "../components/Whiteboard";
-import {
+
+// react-native-agora requires a native dev build — guard for Expo Go
+let RtcSurfaceView: React.ComponentType<any> = View;
+let agoraService = {
+  requestMediaPermissions: async () => {},
+  getEngine: () => null,
+  attachHandlers: () => {},
+  joinChannel: async () => {},
+  leaveChannel: async () => {},
+  destroyEngine: () => {},
+  setMuted: () => {},
+  setVideoOff: () => {},
+  switchCamera: () => {},
+  promoteToCoHost: async () => {},
+  demoteToAudience: async () => {},
+  startScreenShare: async () => {},
+  stopScreenShare: async () => {},
+};
+try {
+  RtcSurfaceView = require("react-native-agora").RtcSurfaceView;
+  agoraService = require("../services/agoraService");
+} catch {}
+
+const {
   requestMediaPermissions, getEngine, attachHandlers, joinChannel,
   leaveChannel, destroyEngine, setMuted, setVideoOff, switchCamera,
   promoteToCoHost, demoteToAudience, startScreenShare, stopScreenShare,
-} from "../services/agoraService";
+} = agoraService as unknown as typeof import("../services/agoraService");
 
 type Role = "host" | "audience";
 type Panel = "participants" | "chat" | "whiteboard" | "breakout" | null;
