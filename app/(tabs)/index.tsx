@@ -11,7 +11,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { useThemeStore } from "../../stores/themeStore";
 import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
-import { RAZORPAY_KEY_ID } from "../../constants";
+import { RAZORPAY_KEY_ID, API_URL } from "../../constants";
 import client from "../../api/client";
 import { blockIOSPurchase } from "../../lib/paymentGate";
 import { useHomeStore } from "../../stores/homeStore";
@@ -433,10 +433,7 @@ const HeroCarousel = React.memo(({ heroSlides, isTabFocused, isHeroVisible, data
                   )}
                   {b.videoUrl && isActiveSlide && !failedVideoIds.current.has(b._id) && (
                     <Video
-                      source={{
-                        uri: b.videoUrl,
-                        overrideFileExtensionAndroid: b.videoUrl.includes(".m3u8") ? "m3u8" : b.videoUrl.includes(".mpd") ? "mpd" : "mp4",
-                      }}
+                      source={{ uri: `${API_URL}/hero-banners/${b._id}/video-stream`, overrideFileExtensionAndroid: "mp4" }}
                       style={{ position:"absolute", width:"100%", height:"100%" }}
                       resizeMode={ResizeMode.COVER}
                       shouldPlay={isTabFocused && isHeroVisible && dataReady} isLooping isMuted={heroMuted} useNativeControls={false}
