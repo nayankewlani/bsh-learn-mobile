@@ -12,7 +12,7 @@ import client from "../api/client";
 type AccessType = "free" | "course" | "session";
 
 interface Course { _id: string; title: string; }
-interface LiveClassInfo { status: string; agoraChannel?: string; }
+interface LiveClassInfo { _id: string; status: string; agoraChannel?: string; }
 interface ConsultBooking {
   _id: string; trainerName: string; sessions: number; bonusSessions: number;
   durationMins: number; totalPaise: number; status: string; clientNote?: string;
@@ -205,7 +205,7 @@ export default function ScheduleLiveScreen() {
                     </View>
                   )}
                   {canGoLive && (
-                    <TouchableOpacity style={[s.primaryBtnSm, { backgroundColor: "#16a34a" }]} onPress={() => router.push("/(tabs)/live" as any)}>
+                    <TouchableOpacity style={[s.primaryBtnSm, { backgroundColor: "#16a34a" }]} onPress={() => router.push({ pathname: "/live-room" as any, params: { classId: b.liveClassId!._id } })}>
                       <Text style={s.primaryBtnTxt}>🔴 Go Live</Text>
                     </TouchableOpacity>
                   )}
