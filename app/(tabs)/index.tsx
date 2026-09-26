@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  FlatList, Image, Dimensions, Modal, Animated, Easing, TextInput, ActivityIndicator,
+  FlatList, Dimensions, Modal, Animated, Easing, TextInput, ActivityIndicator,
   NativeSyntheticEvent, NativeScrollEvent, Alert, Linking, Switch,
+  InteractionManager,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
@@ -12,6 +14,7 @@ import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
 import { RAZORPAY_KEY_ID } from "../../constants";
 import client from "../../api/client";
 import { blockIOSPurchase } from "../../lib/paymentGate";
+import { useHomeStore } from "../../stores/homeStore";
 
 // react-native-razorpay (EAS build only)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -20,9 +23,9 @@ const RazorpayCheckout: {
   open: (o: Record<string, unknown>) => Promise<{ razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }>;
 } | null = _rzpMod?.default?.open ? _rzpMod.default : _rzpMod?.open ? _rzpMod : null;
 
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Video, ResizeMode } from "expo-av";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop, Rect as SvgRect } from "react-native-svg";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const { width: SW } = Dimensions.get("window");
@@ -56,7 +59,7 @@ interface HomeClassType {
 }
 interface HealTool {
   id: number; category: string; title: string; desc: string;
-  icon: IoniconName; duration: string; type: string; free: boolean;
+  icon: string; duration: string; type: string; free: boolean;
   g1: string; g2: string; interactive?: "breathing" | "pomodoro";
 }
 
@@ -74,6 +77,12 @@ const geetaImg       = require("../../assets/geeta-makhijani.png");
 const slide1         = require("../../assets/slide-1.png");
 const slide4         = require("../../assets/slide-4.png");
 const vedic          = require("../../assets/vedic-astro.jpeg");
+const modAstrologyImg    = require("../../assets/module-astrology.png");
+const modTarotImg        = require("../../assets/module-tarot.png");
+const modManifestImg     = require("../../assets/module-manifestation.png");
+const modHypnosisImg     = require("../../assets/module-hypnosis.png");
+const modHealingImg      = require("../../assets/module-healing.png");
+const modDreamsImg       = require("../../assets/module-dreams.png");
 
 // Local images for known trainers (matches consultation page)
 const LOCAL_IMGS_HOME: Record<string, number> = {
@@ -115,25 +124,48 @@ const GOALS = [
   { img: vedic,          name: "Vedic\nAstrology",      count: "6 Batches"  },
 ];
 
+const GUIDANCE_MODULES = [
+  { id:"astrology",     img:modAstrologyImg, name:"Astrology",     accent:"#f59e0b" },
+  { id:"tarot",         img:modTarotImg,     name:"Tarot",         accent:"#60a5fa" },
+  { id:"manifestation", img:modManifestImg,  name:"Manifestation", accent:"#60a5fa" },
+  { id:"hypnosis",      img:modHypnosisImg,  name:"Hypnosis",      accent:"#34d399" },
+  { id:"healing",       img:modHealingImg,   name:"Healing",       accent:"#f472b6" },
+  { id:"dreams",        img:modDreamsImg,    name:"Dreams",        accent:"#818cf8" },
+];
+
+const spiritKundliImg    = require("../../assets/kundli image for application.jpg");
+const spiritPujaImg      = require("../../assets/puja image for application..jpg");
+const spiritPanchangImg  = require("../../assets/Panchanga for application.jpg");
+const spiritNumerologyImg= require("../../assets/numerology image for application.jpg");
+const spiritHoroscopeImg = require("../../assets/horoscope for application.jpg");
+
+const SPIRITUAL_TOOLS = [
+  { id:"kundli",     label:"Kundli",     sub:"Birth chart & destiny",    img: spiritKundliImg },
+  { id:"puja",       label:"Puja",       sub:"Sacred rituals & mantras", img: spiritPujaImg },
+  { id:"panchang",   label:"Panchang",   sub:"Auspicious timings",       img: spiritPanchangImg },
+  { id:"numerology", label:"Numerology", sub:"Numbers & vibrations",     img: spiritNumerologyImg },
+  { id:"horoscope",  label:"Horoscope",  sub:"Daily cosmic guidance",    img: spiritHoroscopeImg },
+];
+
 const TRAINERS = [
-  { name: "Dr. Pradeep Kumar",  role: "Clinical Hypnotherapist & NLP Master",  color: "#7c3aed", exp: "20+ Yrs", sessions: "5,000+", badge: "POPULAR",       subjects: ["Hypnosis","NLP"], rating: 4.9 },
-  { name: "Geeta Makhijani",    role: "Shadow Work & Emotional Healing Expert", color: "#0d9488", exp: "12+ Yrs", sessions: "2,500+", badge: "MASTER TRAINER", subjects: ["Shadow Work","Healing"], rating: 4.8 },
-  { name: "Nalini J. Yadav",    role: "Emotional Healing Expert",               color: "#0d9488", exp: "10+ Yrs", sessions: "1,500+", badge: "POPULAR",       subjects: ["Emotional Healing"], rating: 4.8 },
+  { name: "Dr. Pradeep Kumar",  role: "Clinical Hypnotherapist & NLP Master",  color: "#0c2461", exp: "20+ Yrs", sessions: "5,000+", badge: "POPULAR",       subjects: ["Hypnosis","NLP"], rating: 4.9 },
+  { name: "Geeta Makhijani",    role: "Shadow Work & Emotional Healing Expert", color: "#0c2461", exp: "12+ Yrs", sessions: "2,500+", badge: "MASTER TRAINER", subjects: ["Shadow Work","Healing"], rating: 4.8 },
+  { name: "Nalini J. Yadav",    role: "Emotional Healing Expert",               color: "#0c2461", exp: "10+ Yrs", sessions: "1,500+", badge: "POPULAR",       subjects: ["Emotional Healing"], rating: 4.8 },
   { name: "Vikas Bhardwaj",     role: "NLP & Life Transformation Coach",        color: "#2563eb", exp: "8+ Yrs",  sessions: "1,200+", badge: "POPULAR",       subjects: ["NLP","Coaching"], rating: 4.6 },
   { name: "Dr. Puneet Jain",    role: "Autism & Special Needs Expert",          color: "#16a34a", exp: "12+ Yrs", sessions: "800+",   badge: "SPECIALIST",    subjects: ["Autism","Healing"], rating: 4.9 },
   { name: "Vandana Khurana",    role: "Mind Healing & Wellness Coach",          color: "#db2777", exp: "10+ Yrs", sessions: "1,800+", badge: "POPULAR",       subjects: ["Mind Wellness"], rating: 4.7 },
-  { name: "Dr. Suman Batra",    role: "Hypnotherapy & Spiritual Healing",       color: "#7c3aed", exp: "15+ Yrs", sessions: "2,000+", badge: "MASTER TRAINER", subjects: ["Hypnotherapy","Spiritual"], rating: 4.8 },
-  { name: "Biju Balkrishnan",   role: "Corporate Trainer & Leadership Coach",   color: "#1e3a8a", exp: "18+ Yrs", sessions: "4,000+", badge: "MASTER TRAINER", subjects: ["Corporate","Leadership"], rating: 4.9 },
-  { name: "Dr. Ratna Sawant",   role: "Clinical Hypnotherapist",                color: "#7c3aed", exp: "12+ Yrs", sessions: "1,600+", badge: "POPULAR",       subjects: ["Hypnotherapy"], rating: 4.7 },
+  { name: "Dr. Suman Batra",    role: "Hypnotherapy & Spiritual Healing",       color: "#0c2461", exp: "15+ Yrs", sessions: "2,000+", badge: "MASTER TRAINER", subjects: ["Hypnotherapy","Spiritual"], rating: 4.8 },
+  { name: "Biju Balkrishnan",   role: "Corporate Trainer & Leadership Coach",   color: "#0c2461", exp: "18+ Yrs", sessions: "4,000+", badge: "MASTER TRAINER", subjects: ["Corporate","Leadership"], rating: 4.9 },
+  { name: "Dr. Ratna Sawant",   role: "Clinical Hypnotherapist",                color: "#0c2461", exp: "12+ Yrs", sessions: "1,600+", badge: "POPULAR",       subjects: ["Hypnotherapy"], rating: 4.7 },
   { name: "Shruti Saxena",      role: "Emotional Healing & Wellness Coach",     color: "#db2777", exp: "8+ Yrs",  sessions: "900+",   badge: "POPULAR",       subjects: ["Emotional Healing"], rating: 4.6 },
   { name: "Ankit Vig",          role: "NLP Coach & Motivational Speaker",       color: "#2563eb", exp: "10+ Yrs", sessions: "2,200+", badge: "POPULAR",       subjects: ["NLP","Motivation"], rating: 4.8 },
   { name: "Deepika Handa",      role: "Hypnotherapy & Mind Wellness Coach",     color: "#0ea5e9", exp: "7+ Yrs",  sessions: "700+",   badge: "RISING STAR",   subjects: ["Hypnotherapy"], rating: 4.6 },
   { name: "Rajesh Kumar",       role: "Vastu Master & Energy Healing Expert",   color: "#d97706", exp: "20+ Yrs", sessions: "1,500+", badge: "MASTER TRAINER", subjects: ["Vastu","Energy"], rating: 4.9 },
-  { name: "Abhinnav Kumar",     role: "Hypnotherapy & Transformation Coach",    color: "#7c3aed", exp: "6+ Yrs",  sessions: "500+",   badge: "RISING STAR",   subjects: ["Hypnotherapy"], rating: 4.5 },
+  { name: "Abhinnav Kumar",     role: "Hypnotherapy & Transformation Coach",    color: "#0c2461", exp: "6+ Yrs",  sessions: "500+",   badge: "RISING STAR",   subjects: ["Hypnotherapy"], rating: 4.5 },
 ];
 
 const EDUCATORS = [
-  { name: "BSH Faculty",       subject: "Akashik & Energy Expert",   img: bshLogoImg, followers: "45K",  watchMins: "98M",  badge: "STAR",   resizeMode: "contain" as const, imgBg: "#0d0820", slug: null,
+  { name: "BSH Faculty",       subject: "Akashik & Energy Expert",   img: bshLogoImg, followers: "45K",  watchMins: "98M",  badge: "STAR",   resizeMode: "contain" as const, imgBg: "#0c2461", slug: null,
     bio: "BSH's core team of certified energy healers specializing in Akashik Records, Pranic Healing and Chakra Alignment." },
   { name: "Dr. Pradeep Kumar", subject: "Hypnosis & NLP Expert",     img: slide1,   followers: "161K", watchMins: "315M", badge: "MASTER", resizeMode: "contain" as const, imgBg: "#1a0a3e", slug: "pradeep",
     bio: "India's leading Clinical Hypnotherapist with 20+ years of experience. Has trained over 5,000+ practitioners across 15 countries." },
@@ -152,37 +184,37 @@ const BATCHES = [
 
 const HEAL_CATS = ["All","Breathing","Focus","Sleep","Healing","Student"];
 const HEAL_CAT_ICONS: Record<string, IoniconName> = {
-  All:"apps-outline", Breathing:"fitness-outline", Focus:"timer-outline",
-  Sleep:"moon-outline", Healing:"heart-outline", Student:"school-outline",
+  All:"apps-outline", Breathing:"pulse-outline", Focus:"hourglass-outline",
+  Sleep:"moon-outline", Healing:"heart-circle-outline", Student:"library-outline",
 };
 
 const HEAL_TOOLS: HealTool[] = [
-  { id:1,  category:"Breathing", title:"Box Breathing",              desc:"4-4-4-4 for instant calm",         icon:"fitness-outline",       duration:"5 min",  type:"INTERACTIVE", free:true,  g1:"#4facfe", g2:"#00f2fe", interactive:"breathing" },
-  { id:2,  category:"Breathing", title:"Deep Belly Breathing",       desc:"Activate deep calm naturally",     icon:"water-outline",          duration:"7 min",  type:"GUIDED",      free:true,  g1:"#43e97b", g2:"#38f9d7" },
-  { id:3,  category:"Focus",     title:"Pomodoro Focus Timer",       desc:"25+5 deep work cycles",            icon:"timer-outline",          duration:"25 min", type:"TIMER",       free:true,  g1:"#fa709a", g2:"#fee140", interactive:"pomodoro" },
-  { id:4,  category:"Healing",   title:"Gratitude Meditation",       desc:"5-min heart-opening practice",     icon:"heart-outline",          duration:"5 min",  type:"AUDIO",       free:true,  g1:"#f6d365", g2:"#fda085" },
-  { id:5,  category:"Breathing", title:"4-7-8 Sleep Breathing",      desc:"Fall asleep in minutes",           icon:"moon-outline",           duration:"10 min", type:"GUIDED",      free:false, g1:"#667eea", g2:"#764ba2" },
-  { id:6,  category:"Breathing", title:"Alternate Nostril",          desc:"Balance left-right brain",         icon:"sync-outline",           duration:"8 min",  type:"GUIDED",      free:false, g1:"#f093fb", g2:"#f5576c" },
-  { id:7,  category:"Healing",   title:"Inner Child Healing",        desc:"Heal childhood wounds deeply",     icon:"heart-circle-outline",   duration:"20 min", type:"HYPNOSIS",    free:false, g1:"#4facfe", g2:"#43e97b" },
-  { id:8,  category:"Healing",   title:"Fear Release Hypnosis",      desc:"Build courage from the inside",    icon:"shield-outline",         duration:"15 min", type:"HYPNOSIS",    free:false, g1:"#43e97b", g2:"#38f9d7" },
-  { id:9,  category:"Sleep",     title:"Deep Sleep Hypnosis",        desc:"Guided sleep induction",           icon:"bed-outline",            duration:"30 min", type:"HYPNOSIS",    free:false, g1:"#a18cd1", g2:"#fbc2eb" },
-  { id:10, category:"Sleep",     title:"Night Affirmations",         desc:"Program success while you sleep",  icon:"star-outline",           duration:"12 min", type:"AUDIO",       free:false, g1:"#667eea", g2:"#764ba2" },
-  { id:11, category:"Healing",   title:"Stress Detox Meditation",    desc:"Deep nervous system reset",        icon:"leaf-outline",           duration:"18 min", type:"GUIDED",      free:false, g1:"#a8edea", g2:"#fed6e3" },
-  { id:12, category:"Student",   title:"Exam Confidence Hypnosis",   desc:"Peak performance before exams",    icon:"school-outline",         duration:"18 min", type:"HYPNOSIS",    free:false, g1:"#fa709a", g2:"#fee140" },
-  { id:13, category:"Student",   title:"Memory Activation Audio",    desc:"Alpha waves for retention",        icon:"bulb-outline",           duration:"10 min", type:"AUDIO",       free:false, g1:"#30cfd0", g2:"#330867" },
-  { id:14, category:"Focus",     title:"Alpha Frequency Meditation", desc:"8-12Hz brainwave sync",            icon:"radio-outline",          duration:"20 min", type:"AUDIO",       free:false, g1:"#667eea", g2:"#764ba2" },
-  { id:15, category:"Healing",   title:"Chakra Balancing",           desc:"7-chakra energy alignment",        icon:"color-wand-outline",     duration:"25 min", type:"AUDIO",       free:false, g1:"#f6d365", g2:"#fda085" },
-  { id:16, category:"Healing",   title:"Self Confidence Builder",    desc:"Hypnotic confidence boost",        icon:"person-outline",         duration:"15 min", type:"HYPNOSIS",    free:false, g1:"#fa709a", g2:"#fee140" },
-  { id:17, category:"Healing",   title:"Anger Release Therapy",      desc:"Safe emotional release practice",  icon:"leaf-outline",           duration:"12 min", type:"GUIDED",      free:false, g1:"#43e97b", g2:"#38f9d7" },
-  { id:18, category:"Focus",     title:"Concentration Visualization",desc:"Sharpen mental clarity",           icon:"eye-outline",            duration:"15 min", type:"GUIDED",      free:false, g1:"#a18cd1", g2:"#fbc2eb" },
-  { id:19, category:"Student",   title:"Study Hypnosis Session",     desc:"Enter flow state in minutes",      icon:"book-outline",           duration:"22 min", type:"HYPNOSIS",    free:false, g1:"#4facfe", g2:"#00f2fe" },
-  { id:20, category:"Healing",   title:"Past Life Regression",       desc:"Deep soul-level healing journey",  icon:"time-outline",           duration:"40 min", type:"HYPNOSIS",    free:false, g1:"#fa709a", g2:"#764ba2" },
+  { id:1,  category:"Breathing", title:"Box Breathing",              desc:"4-4-4-4 for instant calm",         icon:"lungs",                  duration:"5 min",  type:"INTERACTIVE", free:true,  g1:"#4facfe", g2:"#00f2fe", interactive:"breathing" },
+  { id:2,  category:"Breathing", title:"Deep Belly Breathing",       desc:"Activate deep calm naturally",     icon:"weather-windy",          duration:"7 min",  type:"GUIDED",      free:true,  g1:"#43e97b", g2:"#38f9d7" },
+  { id:3,  category:"Focus",     title:"Pomodoro Focus Timer",       desc:"25+5 deep work cycles",            icon:"timer-sand",             duration:"25 min", type:"TIMER",       free:true,  g1:"#fa709a", g2:"#fee140", interactive:"pomodoro" },
+  { id:4,  category:"Healing",   title:"Gratitude Meditation",       desc:"5-min heart-opening practice",     icon:"hand-heart",             duration:"5 min",  type:"AUDIO",       free:true,  g1:"#f6d365", g2:"#fda085" },
+  { id:5,  category:"Breathing", title:"4-7-8 Sleep Breathing",      desc:"Fall asleep in minutes",           icon:"weather-night",          duration:"10 min", type:"GUIDED",      free:false, g1:"#667eea", g2:"#764ba2" },
+  { id:6,  category:"Breathing", title:"Alternate Nostril",          desc:"Balance left-right brain",         icon:"yin-yang",               duration:"8 min",  type:"GUIDED",      free:false, g1:"#f093fb", g2:"#f5576c" },
+  { id:7,  category:"Healing",   title:"Inner Child Healing",        desc:"Heal childhood wounds deeply",     icon:"baby-face-outline",      duration:"20 min", type:"HYPNOSIS",    free:false, g1:"#4facfe", g2:"#43e97b" },
+  { id:8,  category:"Healing",   title:"Fear Release Hypnosis",      desc:"Build courage from the inside",    icon:"shield-star",            duration:"15 min", type:"HYPNOSIS",    free:false, g1:"#43e97b", g2:"#38f9d7" },
+  { id:9,  category:"Sleep",     title:"Deep Sleep Hypnosis",        desc:"Guided sleep induction",           icon:"sleep",                  duration:"30 min", type:"HYPNOSIS",    free:false, g1:"#a18cd1", g2:"#fbc2eb" },
+  { id:10, category:"Sleep",     title:"Night Affirmations",         desc:"Program success while you sleep",  icon:"creation",               duration:"12 min", type:"AUDIO",       free:false, g1:"#667eea", g2:"#764ba2" },
+  { id:11, category:"Healing",   title:"Stress Detox Meditation",    desc:"Deep nervous system reset",        icon:"leaf",                   duration:"18 min", type:"GUIDED",      free:false, g1:"#a8edea", g2:"#fed6e3" },
+  { id:12, category:"Student",   title:"Exam Confidence Hypnosis",   desc:"Peak performance before exams",    icon:"trophy",                 duration:"18 min", type:"HYPNOSIS",    free:false, g1:"#fa709a", g2:"#fee140" },
+  { id:13, category:"Student",   title:"Memory Activation Audio",    desc:"Alpha waves for retention",        icon:"brain",                  duration:"10 min", type:"AUDIO",       free:false, g1:"#30cfd0", g2:"#330867" },
+  { id:14, category:"Focus",     title:"Alpha Frequency Meditation", desc:"8-12Hz brainwave sync",            icon:"headphones",             duration:"20 min", type:"AUDIO",       free:false, g1:"#667eea", g2:"#764ba2" },
+  { id:15, category:"Healing",   title:"Chakra Balancing",           desc:"7-chakra energy alignment",        icon:"infinity",               duration:"25 min", type:"AUDIO",       free:false, g1:"#f6d365", g2:"#fda085" },
+  { id:16, category:"Healing",   title:"Self Confidence Builder",    desc:"Hypnotic confidence boost",        icon:"account-heart-outline",  duration:"15 min", type:"HYPNOSIS",    free:false, g1:"#fa709a", g2:"#fee140" },
+  { id:17, category:"Healing",   title:"Anger Release Therapy",      desc:"Safe emotional release practice",  icon:"fire",                   duration:"12 min", type:"GUIDED",      free:false, g1:"#43e97b", g2:"#38f9d7" },
+  { id:18, category:"Focus",     title:"Concentration Visualization",desc:"Sharpen mental clarity",           icon:"eye-circle-outline",     duration:"15 min", type:"GUIDED",      free:false, g1:"#a18cd1", g2:"#fbc2eb" },
+  { id:19, category:"Student",   title:"Study Hypnosis Session",     desc:"Enter flow state in minutes",      icon:"head-lightbulb",         duration:"22 min", type:"HYPNOSIS",    free:false, g1:"#4facfe", g2:"#00f2fe" },
+  { id:20, category:"Healing",   title:"Past Life Regression",       desc:"Deep soul-level healing journey",  icon:"compass",                duration:"40 min", type:"HYPNOSIS",    free:false, g1:"#fa709a", g2:"#764ba2" },
 ];
 
 const TESTIMONIALS = [
-  { name:"Priya Sharma",  init:"P", color:"#7c3aed", subject:"Reiki Student",
+  { name:"Priya Sharma",  init:"P", color:"#0c2461", subject:"Reiki Student",
     text:"BSH Healers transformed my understanding of energy healing. The Reiki course is exceptional!" },
-  { name:"Rahul Mehta",   init:"R", color:"#0d9488", subject:"Hypnosis Student",
+  { name:"Rahul Mehta",   init:"R", color:"#0c2461", subject:"Hypnosis Student",
     text:"The Advance Hypnosis course opened doors I never knew existed. World-class content and teaching." },
   { name:"Anjali Singh",  init:"A", color:"#db2777", subject:"Shadow Work Student",
     text:"Shadow work sessions with live classes helped me heal past traumas. Highly recommend to everyone." },
@@ -198,6 +230,375 @@ const PS_ISSUE_TAGS = [
 ];
 const PS_TIME_SLOTS = ["Morning (8–12)", "Afternoon (12–5)", "Evening (5–9)"];
 
+// ── Pure helpers (module-level so they don't recreate on every render) ────────
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const fmtShortDate = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+};
+
+const fmtShortDateTime = (iso: string) => {
+  const d = new Date(iso);
+  const h = d.getHours(); const m = d.getMinutes();
+  const ampm = h >= 12 ? "PM" : "AM";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${h%12||12}:${String(m).padStart(2,"0")} ${ampm}`;
+};
+
+const fmtCountdown = (scheduledAt: string, status: string): { label: string; color: string; bg: string } => {
+  if (status === "live") return { label: "🔴 LIVE NOW", color: "#fff", bg: "#ef4444" };
+  const diff = new Date(scheduledAt).getTime() - Date.now();
+  if (diff <= 0) return { label: "STARTING NOW", color: "#fff", bg: "#ef4444" };
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  const today = new Date().toDateString() === new Date(scheduledAt).toDateString();
+  if (h < 24 && today) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return { label: `LIVE IN ${pad(h)}:${pad(m)}:${pad(s)}`, color: "#fff", bg: "#0c2461" };
+  }
+  const tom = new Date(); tom.setDate(tom.getDate() + 1);
+  if (tom.toDateString() === new Date(scheduledAt).toDateString()) return { label: "TOMORROW", color: "#fff", bg: "#0c2461" };
+  return { label: fmtShortDate(scheduledAt), color: "#fff", bg: "#0c2461" };
+};
+
+// CountdownBadge — owns its own 1-second timer so only this tiny component
+// re-renders each tick instead of the entire HomeScreen.
+const CountdownBadge = React.memo(({ scheduledAt, status, badgeStyle, textStyle }: {
+  scheduledAt: string; status: string; badgeStyle: any; textStyle: any;
+}) => {
+  const [, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const { label, bg } = fmtCountdown(scheduledAt, status);
+  return (
+    <View style={[badgeStyle, { backgroundColor: bg }]}>
+      <Text style={textStyle}>{label}</Text>
+    </View>
+  );
+});
+
+// FlashingDot — owns its own 1.2-second toggle so only this 9×9 View
+// re-renders each blink instead of the entire HomeScreen.
+const FlashingDot = React.memo(() => {
+  const [green, setGreen] = React.useState(false);
+  React.useEffect(() => {
+    const iv = setInterval(() => setGreen(v => !v), 1200);
+    return () => clearInterval(iv);
+  }, []);
+  return (
+    <View style={{
+      position: "absolute", top: 0, right: 0,
+      width: 9, height: 9, borderRadius: 5,
+      backgroundColor: green ? "#22c55e" : "#ef4444",
+      borderWidth: 1.5, borderColor: "rgba(0,0,0,0.6)",
+    }} />
+  );
+});
+
+const fmtINR = (paise: number) => "₹" + String(Math.round(paise / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const trainerInitials = (name: string) => name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+const fmtPlayerTime = (secs: number) => {
+  const m = Math.floor(secs / 60); const s = secs % 60;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+};
+
+// ── Hero types (module-level so HeroCarousel can reference them) ──────────────
+interface LiveHeroSession {
+  _id: string; title: string;
+  educator: { _id: string; name: string; avatar?: string } | string;
+  scheduledAt: string; status: string; enrolledStudents: string[];
+  thumbnailUrl?: string;
+}
+interface HeroBannerItem {
+  _id: string; _type: "banner"; title: string; superTitle: string;
+  educatorName: string; badgeText: string; badgeBg: string; showTimer: boolean;
+  timerEndsAt?: string; videoUrl?: string; thumbnailUrl?: string; ctaLink: string;
+}
+type HeroSlide = (LiveHeroSession & { _type?: "live" }) | HeroBannerItem;
+
+// ── PLAYER_SCRIPTS — hoisted so it isn't recreated on every render ────────────
+const PLAYER_SCRIPTS: Record<string, string[]> = {
+  HYPNOSIS: [
+    "Find a comfortable position and gently close your eyes…",
+    "Take three slow, deep breaths — in through the nose, out through the mouth…",
+    "Let every muscle begin to soften and release…",
+    "Feel a wave of calm spreading from your head all the way to your toes…",
+    "Your mind is clear, open, and completely at ease…",
+    "Allow the healing to flow through every part of your being…",
+    "You are safe, deeply relaxed, and at total peace…",
+    "Rest here as long as you need. The healing continues…",
+  ],
+  AUDIO: [
+    "Find a quiet space and settle in comfortably…",
+    "Take a deep breath in… hold gently… and slowly release…",
+    "Let these words wash over you like gentle waves…",
+    "Your mind is open and receptive to positive change…",
+    "Breathe naturally — let the session guide you deeper…",
+    "You are doing beautifully. Stay with this feeling…",
+    "Let this energy fill every corner of your being…",
+    "Carry this peace and clarity with you all day…",
+  ],
+  GUIDED: [
+    "Settle into a comfortable seated or lying position…",
+    "Close your eyes and take three cleansing breaths…",
+    "Notice the natural rhythm of your breath — no need to change it…",
+    "With each exhale, release any tension you're holding…",
+    "Your body knows how to heal itself. Trust the process…",
+    "Deepen your awareness with every breath cycle…",
+    "You are whole. You are well. You are at peace…",
+    "Gently return to the room whenever you feel ready…",
+  ],
+};
+
+// Hoisted so it's never reallocated on render
+const BREATH_PHASES: Array<{ phase: "inhale"|"hold1"|"exhale"|"hold2"; dur: number }> = [
+  { phase:"inhale",dur:4 },{ phase:"hold1",dur:4 },
+  { phase:"exhale",dur:4 },{ phase:"hold2",dur:4 },
+];
+
+// ── HeroCarousel — self-contained: owns heroIndex, heroMuted, auto-cycle ──────
+// Extracted so the 5-second index update only re-renders this small component
+// instead of the entire HomeScreen (trainers, healing tools, batches, etc.)
+const HeroCarousel = React.memo(({ heroSlides, isTabFocused, isHeroVisible, dataReady, s, insets }: {
+  heroSlides: HeroSlide[];
+  isTabFocused: boolean;
+  isHeroVisible: boolean;
+  /** true once all 8 API calls have settled — prevents video competing with data fetch */
+  dataReady: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  s: any;
+  insets: { top: number };
+}) => {
+  const [heroIndex, setHeroIndex] = React.useState(0);
+  const [heroMuted, setHeroMuted] = React.useState(true);
+  const heroRef = React.useRef<FlatList>(null);
+  const failedVideoIds = React.useRef<Set<string>>(new Set());
+  const [, setVideoFailCount] = React.useState(0);
+
+  // Auto-cycle slides every 5 s — state update now scoped to this component only
+  React.useEffect(() => {
+    if (heroSlides.length === 0) return;
+    const t = setInterval(() => {
+      setHeroIndex(i => {
+        const total = heroSlides.length;
+        const next = total > 0 ? (i + 1) % total : 0;
+        try { heroRef.current?.scrollToIndex({ index: next, animated: true }); } catch {}
+        return next;
+      });
+    }, 5000);
+    return () => clearInterval(t);
+  }, [heroSlides.length]);
+
+  if (heroSlides.length === 0) return null;
+
+  return (
+    <View style={{ backgroundColor:"#0d0820", borderBottomLeftRadius:28, borderBottomRightRadius:28, overflow:"hidden", marginBottom:8 }}>
+      <View style={{ height: SW * 1.1 + insets.top, backgroundColor:"#0d0820" }}>
+        <FlatList
+          ref={heroRef}
+          data={heroSlides}
+          horizontal pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={item => item._id}
+          getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+          onScrollToIndexFailed={info => {
+            heroRef.current?.scrollToOffset({ offset: SW * info.index, animated: true });
+          }}
+          onScroll={e => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+            if (idx !== heroIndex) setHeroIndex(idx);
+          }}
+          scrollEventThrottle={16}
+          removeClippedSubviews
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          renderItem={({ item, index: slideIdx }) => {
+            const isBanner = (item as HeroBannerItem)._type === "banner";
+            const isActiveSlide = slideIdx === heroIndex && isTabFocused;
+
+            // ── Banner slide ──────────────────────────────────────────────────
+            if (isBanner) {
+              const b = item as HeroBannerItem;
+              const dest = b.ctaLink || ("/(tabs)/live" as any);
+              return (
+                <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
+                  onPress={() => router.push(dest as any)}>
+                  {b.thumbnailUrl ? (
+                    <Image source={{ uri: b.thumbnailUrl }} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" cachePolicy="disk" />
+                  ) : (
+                    <Image source={slide1} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" />
+                  )}
+                  {b.videoUrl && isActiveSlide && !failedVideoIds.current.has(b._id) && (
+                    <Video
+                      source={{
+                        uri: b.videoUrl,
+                        overrideFileExtensionAndroid: b.videoUrl.includes(".m3u8") ? "m3u8" : b.videoUrl.includes(".mpd") ? "mpd" : "mp4",
+                      }}
+                      style={{ position:"absolute", width:"100%", height:"100%" }}
+                      resizeMode={ResizeMode.COVER}
+                      shouldPlay={isTabFocused && isHeroVisible && dataReady} isLooping isMuted={heroMuted} useNativeControls={false}
+                      onError={() => { failedVideoIds.current.add(b._id); setVideoFailCount(c => c + 1); }} />
+                  )}
+                  <View pointerEvents="none" style={{ position:"absolute", bottom:0, left:0, right:0, height:280 }}>
+                    <Svg width={SW} height={280} viewBox={`0 0 ${SW} 280`} preserveAspectRatio="none">
+                      <Defs>
+                        <SvgGradient id="bannerFade" x1="0" y1="0" x2="0" y2="1">
+                          <Stop offset="0"    stopColor="#0d0820" stopOpacity="0"    />
+                          <Stop offset="0.25" stopColor="#0d0820" stopOpacity="0"    />
+                          <Stop offset="0.58" stopColor="#0d0820" stopOpacity="0.52" />
+                          <Stop offset="0.80" stopColor="#0d0820" stopOpacity="0.84" />
+                          <Stop offset="1"    stopColor="#0d0820" stopOpacity="1"    />
+                        </SvgGradient>
+                      </Defs>
+                      <SvgRect x="0" y="0" width={SW} height={280} fill="url(#bannerFade)" />
+                    </Svg>
+                  </View>
+                  <View style={s.heroOverlay}>
+                    {b.superTitle ? <Text style={s.heroSuperTitle}>{b.superTitle}</Text> : null}
+                    {b.educatorName ? <Text style={s.heroEducatorName}>{b.educatorName}</Text> : null}
+                    <Text style={s.heroSessionTitle} numberOfLines={3}>{b.title}</Text>
+                    {b.showTimer && b.timerEndsAt ? (
+                      <CountdownBadge scheduledAt={b.timerEndsAt} status="scheduled" badgeStyle={s.heroCountdownBadge} textStyle={s.heroCountdownTxt} />
+                    ) : b.badgeText ? (
+                      <View style={[s.heroCountdownBadge, { backgroundColor: b.badgeBg || "#0c2461" }]}>
+                        <Text style={s.heroCountdownTxt}>{b.badgeText}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {b.videoUrl && (
+                    <TouchableOpacity style={s.heroMuteBtn} onPress={() => setHeroMuted(m => !m)}>
+                      <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={15} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              );
+            }
+
+            // ── Live session slide ─────────────────────────────────────────────
+            const live = item as LiveHeroSession;
+            const eduObj = typeof live.educator === "object" ? live.educator : null;
+            const eduName = eduObj?.name ?? (typeof live.educator === "string" ? live.educator : "BSH Healer");
+            const avatar = eduObj?.avatar ? { uri: eduObj.avatar } : slide1;
+            const heroVideo = (live as any).heroVideoUrl as string | undefined;
+            return (
+              <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
+                onPress={() => router.push("/(tabs)/live" as any)}>
+                <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" cachePolicy="disk" />
+                {heroVideo && isActiveSlide && (
+                  <Video
+                    source={{
+                      uri: heroVideo,
+                      overrideFileExtensionAndroid: heroVideo.includes(".m3u8") ? "m3u8" : heroVideo.includes(".mpd") ? "mpd" : "mp4",
+                    }}
+                    style={{ position:"absolute", width:"100%", height:"100%" }}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={isTabFocused && isHeroVisible && dataReady} isLooping isMuted={heroMuted} useNativeControls={false} />
+                )}
+                <View style={{ position:"absolute", top:0, left:0, right:0, height: insets.top + 90 }}>
+                  <View style={{ flex:1, backgroundColor:"rgba(4,2,14,0.45)" }} />
+                </View>
+                <View pointerEvents="none" style={{ position:"absolute", bottom:0, left:0, right:0, height:280 }}>
+                  <Svg width={SW} height={280} viewBox={`0 0 ${SW} 280`} preserveAspectRatio="none">
+                    <Defs>
+                      <SvgGradient id="liveFade" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0"    stopColor="#0d0820" stopOpacity="0"    />
+                        <Stop offset="0.25" stopColor="#0d0820" stopOpacity="0"    />
+                        <Stop offset="0.58" stopColor="#0d0820" stopOpacity="0.52" />
+                        <Stop offset="0.80" stopColor="#0d0820" stopOpacity="0.84" />
+                        <Stop offset="1"    stopColor="#0d0820" stopOpacity="1"    />
+                      </SvgGradient>
+                    </Defs>
+                    <SvgRect x="0" y="0" width={SW} height={280} fill="url(#liveFade)" />
+                  </Svg>
+                </View>
+                <View style={s.heroOverlay}>
+                  <Text style={s.heroSuperTitle}>WITH EXPERT HEALERS</Text>
+                  <Text style={s.heroEducatorName}>{eduName}</Text>
+                  <Text style={s.heroSessionTitle} numberOfLines={3}>{live.title}</Text>
+                  <CountdownBadge scheduledAt={live.scheduledAt} status={live.status} badgeStyle={s.heroCountdownBadge} textStyle={s.heroCountdownTxt} />
+                  {live.enrolledStudents?.length > 0 && (
+                    <View style={s.heroAttendeeRow}>
+                      {[...live.enrolledStudents].slice(0, 3).map((_, ai) => (
+                        <View key={ai} style={[s.heroAvatarThumb, { left: ai * 16, backgroundColor: ["#0c2461","#0c2461","#db2777"][ai] }]}>
+                          <Text style={{ color:"#fff", fontSize:8 }}>👤</Text>
+                        </View>
+                      ))}
+                      <Text style={[s.heroAttendeeTxt, { marginLeft: Math.min(live.enrolledStudents.length, 3) * 16 + 8 }]}>
+                        +{live.enrolledStudents.length} Attending
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity style={s.heroMuteBtn} onPress={() => setHeroMuted(m => !m)}>
+                  <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={15} color="#fff" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
+
+      {/* Pagination dots */}
+      <View style={{ paddingTop:16, paddingBottom:2, flexDirection:"row", justifyContent:"center", gap:6 }}>
+        {heroSlides.map((_, i) => (
+          <View key={i} style={[s.heroDot, i === heroIndex && s.heroDotActive]} />
+        ))}
+      </View>
+
+      {/* ── Section header ── */}
+      <View style={{ paddingTop:20, paddingHorizontal:16, paddingBottom:0 }}>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={{ color:"#fff", fontSize:20, fontWeight:"800", letterSpacing:-0.2 }}>
+          Find Your Right Guidance
+        </Text>
+      </View>
+
+      {/* ── 3×2 module card grid ── */}
+      <View style={{ flexDirection:"row", flexWrap:"wrap", paddingHorizontal:12, gap:8, marginTop:14, paddingBottom:28 }}>
+        {GUIDANCE_MODULES.map((m) => {
+          const cardW = (SW - 40) / 3;
+          const cardH = cardW * 1.28;
+          return (
+            <TouchableOpacity key={m.id}
+              style={{ width:cardW, height:cardH, borderRadius:12, overflow:"hidden", borderWidth:1, borderColor:"rgba(255,255,255,0.09)" }}
+              activeOpacity={0.8}
+              onPress={() => router.push(`/module/${m.id}` as any)}>
+              <Image source={m.img} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" />
+              <View pointerEvents="none" style={{ position:"absolute", bottom:0, left:0, right:0, height:cardH * 0.55 }}>
+                <Svg width={cardW} height={cardH * 0.55} viewBox={`0 0 ${cardW} ${cardH * 0.55}`} preserveAspectRatio="none">
+                  <Defs>
+                    <SvgGradient id={`mgr_${m.id}`} x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0"   stopColor="#0d0820" stopOpacity="0"    />
+                      <Stop offset="0.5" stopColor="#0d0820" stopOpacity="0.58" />
+                      <Stop offset="1"   stopColor="#0d0820" stopOpacity="0.95" />
+                    </SvgGradient>
+                  </Defs>
+                  <SvgRect x="0" y="0" width={cardW} height={cardH * 0.55} fill={`url(#mgr_${m.id})`} />
+                </Svg>
+              </View>
+              <View style={{ position:"absolute", bottom:0, left:0, right:0, paddingHorizontal:8, paddingBottom:9 }}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  style={{ color:"#fff", fontSize:11, fontWeight:"800", letterSpacing:0.3, textTransform:"uppercase" }}>
+                  {m.name}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+});
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { user } = useAuthStore();
@@ -208,11 +609,18 @@ export default function HomeScreen() {
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollYRef = useRef(0);
   const headerHiddenRef = useRef(false);
+  const [isHeroVisible, setIsHeroVisible] = useState(true);
+  const heroVisibleRef = useRef(true);
 
-  const handleMainScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const delta = y - lastScrollYRef.current;
     lastScrollYRef.current = y;
+    const nowVisible = y < SW * 0.7;
+    if (nowVisible !== heroVisibleRef.current) {
+      heroVisibleRef.current = nowVisible;
+      setIsHeroVisible(nowVisible);
+    }
     if (y < 60) {
       if (headerHiddenRef.current) {
         headerHiddenRef.current = false;
@@ -229,17 +637,23 @@ export default function HomeScreen() {
       showTabBar();
       Animated.timing(headerTranslateY, { toValue:0, duration:200, useNativeDriver:true }).start();
     }
-  };
+  }, []);
 
-  // Home Classes API state
-  const [homeClasses, setHomeClasses] = useState<HomeClassType[]>([]);
+  // Individual selectors — HomeScreen only re-renders for the field it uses,
+  // not on every store mutation (e.g. lastFetched change no longer fires here)
+  const heroBanners      = useHomeStore(s => s.heroBanners);
+  const upcomingClasses  = useHomeStore(s => s.upcomingClasses);
+  const liveHeroSessions = useHomeStore(s => s.liveHeroSessions);
+  const homeTrainers     = useHomeStore(s => s.homeTrainers);
+  const trainersLoaded   = useHomeStore(s => s.trainersLoaded);
+  const apiPrograms      = useHomeStore(s => s.apiPrograms);
+  const apiBatches       = useHomeStore(s => s.apiBatches);
+  const homeClasses      = useHomeStore(s => s.homeClasses);
+  const fetchHomeData    = useHomeStore(s => s.fetchHomeData);
+  const lastFetched      = useHomeStore(s => s.lastFetched);
   const [activeSubject, setActiveSubject] = useState<string>("");
   const [hasHealingAccess, setHasHealingAccess] = useState(false);
   const [healPayLoading, setHealPayLoading] = useState(false);
-
-  // Trainers from consultation API
-  const [homeTrainers, setHomeTrainers] = useState<ApiTrainer[]>([]);
-  const [trainersLoaded, setTrainersLoaded] = useState(false);
 
   // API-first: exact same source as Consultation page. Static only if API fails.
   const displayTrainers = useMemo(() => {
@@ -250,7 +664,7 @@ export default function HomeScreen() {
         .map(api => ({
           name:     api.name,
           role:     api.trainerRole || "",
-          color:    api.trainerColor || "#7c3aed",
+          color:    api.trainerColor || "#0c2461",
           exp:      api.experience || "",
           sessions: api.sessionsDisplay || "",
           rating:   api.rating || 0,
@@ -300,9 +714,13 @@ export default function HomeScreen() {
   const pomPhaseRef = useRef<"focus"|"shortBreak"|"longBreak">("focus");
   const pomSecsRef = useRef(25 * 60);
   const pomSessionRef = useRef(1);
-  pomPhaseRef.current = pomPhase;
-  pomSecsRef.current = pomSecs;
-  pomSessionRef.current = pomSession;
+  // Sync refs after render — safe for Concurrent Mode (refs are read only in
+  // setInterval callbacks, never during render, so no tearing risk)
+  useEffect(() => {
+    pomPhaseRef.current = pomPhase;
+    pomSecsRef.current = pomSecs;
+    pomSessionRef.current = pomSession;
+  }, [pomPhase, pomSecs, pomSession]);
 
   // Booking modal
   const [bookModal, setBookModal] = useState<"session"|"freeCall"|null>(null);
@@ -319,31 +737,13 @@ export default function HomeScreen() {
   const [plusLoading, setPlusLoading] = useState(false);
   const [liveMenuOpen, setLiveMenuOpen] = useState(false);
 
-  // Task 1: Chat dot red/green pulse
-  const [chatDotGreen, setChatDotGreen] = useState(false);
-
-  // Task 2: Healer search
-  const [healerQuery, setHealerQuery] = useState("");
-
   // Task 3: Dynamic programs + batches
-  const [apiPrograms, setApiPrograms] = useState<ApiProgram[]>([]);
-  const [apiBatches, setApiBatches]   = useState<ApiBatch[]>([]);
   const [progModal, setProgModal]     = useState<ApiProgram | null>(null);
   const [batchModal, setBatchModal]   = useState<ApiBatch | null>(null);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
 
-  // ── Live Sessions Hero (SoulSensei-style video hero with countdown) ─────────
-  interface LiveHeroSession { _id: string; title: string; educator: { _id: string; name: string; avatar?: string } | string; scheduledAt: string; status: string; enrolledStudents: string[]; thumbnailUrl?: string; }
-  interface HeroBannerItem { _id: string; _type: "banner"; title: string; superTitle: string; educatorName: string; badgeText: string; badgeBg: string; showTimer: boolean; timerEndsAt?: string; videoUrl?: string; thumbnailUrl?: string; ctaLink: string; }
-  interface UpcomingClassItem { _id: string; title: string; educatorName: string; scheduledAt: string; status: string; thumbnailUrl?: string; ctaLink: string; }
-  type HeroSlide = (LiveHeroSession & { _type?: "live" }) | HeroBannerItem;
-  const [liveHeroSessions, setLiveHeroSessions] = useState<LiveHeroSession[]>([]);
-  const [heroBanners, setHeroBanners]           = useState<HeroBannerItem[]>([]);
-  const [upcomingClasses, setUpcomingClasses]   = useState<UpcomingClassItem[]>([]);
-  const [heroIndex, setHeroIndex]     = useState(0);
-  const [heroMuted, setHeroMuted]     = useState(true);
+  // ── Hero tab focus state (types + heroIndex/heroMuted live inside HeroCarousel) ─
   const [isTabFocused, setIsTabFocused] = useState(true);
-  const heroRef = useRef<FlatList>(null);
 
   // Pause all hero videos when navigating away from this tab
   useFocusEffect(
@@ -352,113 +752,34 @@ export default function HomeScreen() {
       return () => setIsTabFocused(false);
     }, [])
   );
-  const [, setCountdownTick] = useState(0); // forces re-render every second
-
-  const fmtCountdown = (scheduledAt: string, status: string): { label: string; color: string; bg: string } => {
-    if (status === "live") return { label: "🔴 LIVE NOW", color: "#fff", bg: "#ef4444" };
-    const diff = new Date(scheduledAt).getTime() - Date.now();
-    if (diff <= 0) return { label: "STARTING NOW", color: "#fff", bg: "#ef4444" };
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    const today = new Date().toDateString() === new Date(scheduledAt).toDateString();
-    if (h < 24 && today) {
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return { label: `LIVE IN ${pad(h)}:${pad(m)}:${pad(s)}`, color: "#fff", bg: "#7c3aed" };
-    }
-    const tom = new Date(); tom.setDate(tom.getDate() + 1);
-    if (tom.toDateString() === new Date(scheduledAt).toDateString()) return { label: "TOMORROW", color: "#fff", bg: "#7c3aed" };
-    return { label: new Date(scheduledAt).toLocaleDateString("en-IN", { day:"numeric", month:"short" }), color: "#fff", bg: "#7c3aed" };
-  };
 
   // ── Effects ─────────────────────────────────────────────────────────────────
-  // Fetch hero banners (admin-uploaded) and live sessions for hero carousel
-  useEffect(() => {
-    client.get("/hero-banners").then(({ data }) => {
-      setHeroBanners((data.banners ?? []).map((b: any) => ({ ...b, _type: "banner" })));
-    }).catch(() => {});
-    client.get("/upcoming-classes").then(({ data }) => {
-      setUpcomingClasses(data.classes ?? []);
-    }).catch(() => {});
-    Promise.all([
-      client.get("/live-classes?status=live"),
-      client.get("/live-classes?status=scheduled"),
-    ]).then(([live, sched]) => {
-      const combined = [...(live.data.classes ?? []), ...(sched.data.classes ?? [])];
-      setLiveHeroSessions(combined.slice(0, 8));
-    }).catch(() => {});
-  }, []);
+  // heroBanners is already a stable Zustand reference — no copy needed
+  const heroSlides = heroBanners as HeroSlide[];
 
-  // Countdown ticker — updates every second so "LIVE IN HH:MM:SS" stays accurate
-  useEffect(() => {
-    const iv = setInterval(() => setCountdownTick(t => t + 1), 1000);
-    return () => clearInterval(iv);
-  }, []);
+  // Trigger TTL-cached fetch on mount and each time the home tab gains focus.
+  // The 2-minute TTL inside fetchHomeData prevents redundant network calls.
+  useEffect(() => { fetchHomeData(); }, []);
+  useFocusEffect(useCallback(() => { fetchHomeData(); }, [fetchHomeData]));
 
-  // Combined hero slides: admin banners first, then live sessions
-  const heroSlides = useMemo<HeroSlide[]>(() => [
-    ...heroBanners,
-    ...liveHeroSessions.map(s => ({ ...s, _type: "live" as const })),
-  ], [heroBanners, liveHeroSessions]);
-
-  // Auto-cycle hero
+  // Set active subject when home classes first arrive from the store
   useEffect(() => {
-    if (heroSlides.length === 0) return;
-    const t = setInterval(() => {
-      setHeroIndex(i => {
-        const total = heroSlides.length;
-        const next = total > 0 ? (i + 1) % total : 0;
-        try { heroRef.current?.scrollToIndex({ index: next, animated: true }); } catch {}
-        return next;
-      });
-    }, 5000);
-    return () => clearInterval(t);
-  }, [heroSlides.length]);
+    if (homeClasses.length > 0 && !activeSubject) {
+      const subjects = [...new Set((homeClasses as any[]).map((c) => c.subject as string))];
+      setActiveSubject(subjects[0] ?? "");
+    }
+  }, [homeClasses.length]);
 
-  // Fetch trainers on mount — same lifecycle as consultation page (no user dependency)
+  // User-specific: healing tools access check (re-runs on login/logout)
   useEffect(() => {
-    client.get("/chat/online-educators")
-      .then(({ data }) => setHomeTrainers(data.educators ?? []))
-      .catch(() => {})
-      .finally(() => setTrainersLoaded(true));
-  }, []);
-
-  // Chat dot red/green toggle
-  useEffect(() => {
-    const iv = setInterval(() => setChatDotGreen(v => !v), 1200);
-    return () => clearInterval(iv);
-  }, []);
-
-  // Dynamic programs + batches from admin
-  useEffect(() => {
-    client.get("/courses/programs/public")
-      .then(({ data }) => setApiPrograms(data.programs ?? []))
-      .catch(() => {});
-    client.get("/courses/featured")
-      .then(({ data }) => setApiBatches(data.courses ?? []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    client.get("/home-classes").then(({ data }) => {
-      const cls: HomeClassType[] = data.classes ?? [];
-      setHomeClasses(cls);
-      if (cls.length > 0) {
-        const subjects = [...new Set(cls.map(c => c.subject))];
-        setActiveSubject(subjects[0] ?? "");
-      }
-    }).catch(() => {});
-    if (user) {
+    if (!user) { setHasHealingAccess(false); return; }
+    InteractionManager.runAfterInteractions(() => {
       client.get("/payments/program-access/healing-tools")
         .then(({ data }) => setHasHealingAccess(data.hasAccess === true))
         .catch(() => {});
-    }
-  }, [user]);
+    });
+  }, [user?._id]);
 
-  const BREATH_PHASES: Array<{phase:"inhale"|"hold1"|"exhale"|"hold2"; dur:number}> = [
-    { phase:"inhale",dur:4 },{ phase:"hold1",dur:4 },
-    { phase:"exhale",dur:4 },{ phase:"hold2",dur:4 },
-  ];
 
   useEffect(() => {
     if (!breathModalOpen) {
@@ -509,8 +830,8 @@ export default function HomeScreen() {
   const resetPomodoro = () => { setPomRunning(false); setPomPhase("focus"); setPomSecs(25*60); setPomSession(1); };
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-  const toggleSIssue = (tag: string) =>
-    setSIssues(prev => prev.includes(tag) ? prev.filter(i=>i!==tag) : [...prev, tag]);
+  const toggleSIssue = useCallback((tag: string) =>
+    setSIssues(prev => prev.includes(tag) ? prev.filter(i=>i!==tag) : [...prev, tag]), []);
 
   const submitSession = async () => {
     if (!sName.trim()||!sEmail.trim()||sIssues.length===0) {
@@ -527,10 +848,10 @@ export default function HomeScreen() {
     } catch { setSStep("form"); Alert.alert("Submission Failed","Could not send your request. Please try again."); }
   };
 
-  const closeSessionModal = () => {
+  const closeSessionModal = useCallback(() => {
     setBookModal(null); setSStep("form"); setSName(""); setSEmail("");
     setSPhone(""); setSDob(""); setSDetail(""); setSIssues([]); setSTimeSlot("");
-  };
+  }, []);
 
   const handleHealTap = (tool: HealTool) => {
     if (!tool.free && !hasHealingAccess) {
@@ -568,7 +889,7 @@ export default function HomeScreen() {
       const paymentData = await RazorpayCheckout.open({
         key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
         name:"BSH", description:"Healing Tools — Lifetime Access",
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#7c3aed" },
+        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
       });
       await client.post("/payments/verify", {
         razorpayOrderId:paymentData.razorpay_order_id,
@@ -602,7 +923,7 @@ export default function HomeScreen() {
       const paymentData = await RazorpayCheckout.open({
         key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
         name:"BSH", description:"BSH Plus — 12 Months Unlimited Access",
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#7c3aed" },
+        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
       });
       await client.post("/payments/verify", {
         razorpayOrderId:paymentData.razorpay_order_id,
@@ -618,15 +939,15 @@ export default function HomeScreen() {
     } finally { setPlusLoading(false); }
   };
 
-  const BREATH_COLORS: Record<string,string> = { inhale:"#4facfe",hold1:"#00f2fe",exhale:"#a78bfa",hold2:"#fbc2eb" };
+  const BREATH_COLORS: Record<string,string> = { inhale:"#4facfe",hold1:"#00f2fe",exhale:"#60a5fa",hold2:"#fbc2eb" };
   const BREATH_LABELS: Record<string,string> = { inhale:"Inhale ↑",hold1:"Hold •",exhale:"Exhale ↓",hold2:"Hold •" };
   const POM_LABELS: Record<string,string> = { focus:"Focus Time",shortBreak:"Short Break ☕",longBreak:"Long Break 🎉" };
-  const POM_COLORS: Record<string,string> = { focus:"#7c3aed",shortBreak:"#059669",longBreak:"#d97706" };
+  const POM_COLORS: Record<string,string> = { focus:"#0c2461",shortBreak:"#059669",longBreak:"#d97706" };
 
-  const healFiltered = HEAL_TOOLS.filter(tool =>
-    (healCat==="All"||tool.category===healCat) &&
-    (!healQ||tool.title.toLowerCase().includes(healQ.toLowerCase())||tool.desc.toLowerCase().includes(healQ.toLowerCase()))
-  );
+  const healFiltered = useMemo(() => HEAL_TOOLS.filter(tool =>
+    (healCat === "All" || tool.category === healCat) &&
+    (!healQ || tool.title.toLowerCase().includes(healQ.toLowerCase()) || tool.desc.toLowerCase().includes(healQ.toLowerCase()))
+  ), [healCat, healQ]);
 
   // ── Heal Player timer ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -679,61 +1000,24 @@ export default function HomeScreen() {
     };
   }, [healPlayer]);
 
-  const PLAYER_SCRIPTS: Record<string, string[]> = {
-    HYPNOSIS: [
-      "Find a comfortable position and gently close your eyes…",
-      "Take three slow, deep breaths — in through the nose, out through the mouth…",
-      "Let every muscle begin to soften and release…",
-      "Feel a wave of calm spreading from your head all the way to your toes…",
-      "Your mind is clear, open, and completely at ease…",
-      "Allow the healing to flow through every part of your being…",
-      "You are safe, deeply relaxed, and at total peace…",
-      "Rest here as long as you need. The healing continues…",
-    ],
-    AUDIO: [
-      "Find a quiet space and settle in comfortably…",
-      "Take a deep breath in… hold gently… and slowly release…",
-      "Let these words wash over you like gentle waves…",
-      "Your mind is open and receptive to positive change…",
-      "Breathe naturally — let the session guide you deeper…",
-      "You are doing beautifully. Stay with this feeling…",
-      "Let this energy fill every corner of your being…",
-      "Carry this peace and clarity with you all day…",
-    ],
-    GUIDED: [
-      "Settle into a comfortable seated or lying position…",
-      "Close your eyes and take three cleansing breaths…",
-      "Notice the natural rhythm of your breath — no need to change it…",
-      "With each exhale, release any tension you're holding…",
-      "Your body knows how to heal itself. Trust the process…",
-      "Deepen your awareness with every breath cycle…",
-      "You are whole. You are well. You are at peace…",
-      "Gently return to the room whenever you feel ready…",
-    ],
-  };
 
-  const playerDurationSecs = healPlayer ? (parseInt(healPlayer.duration) || 10) * 60 : 600;
-  const playerPhases       = PLAYER_SCRIPTS[healPlayer?.type ?? "AUDIO"] ?? PLAYER_SCRIPTS.AUDIO;
-  const phaseInterval      = Math.floor(playerDurationSecs / playerPhases.length);
+  const playerDurationSecs = useMemo(() => healPlayer ? (parseInt(healPlayer.duration) || 10) * 60 : 600, [healPlayer]);
+  const playerPhases       = useMemo(() => PLAYER_SCRIPTS[healPlayer?.type ?? "AUDIO"] ?? PLAYER_SCRIPTS.AUDIO, [healPlayer]);
+  const phaseInterval      = useMemo(() => Math.floor(playerDurationSecs / playerPhases.length), [playerDurationSecs, playerPhases]);
   const currentPhaseIdx    = Math.min(Math.floor(playerElapsed / Math.max(phaseInterval, 1)), playerPhases.length - 1);
   const currentPhaseText   = playerPhases[currentPhaseIdx];
   const playerProgress     = Math.min(playerElapsed / playerDurationSecs, 1);
 
-  const fmtPlayerTime = (s: number) => {
-    const m = Math.floor(s / 60); const sec = s % 60;
-    return `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
-  };
   const PLAYER_CIRC_R = 88;
   const PLAYER_CIRC_C = 2 * Math.PI * PLAYER_CIRC_R;
   const playerDashOff = PLAYER_CIRC_C * (1 - playerProgress);
   const playerOrb1Y   = playerOrb1Anim.interpolate({ inputRange:[0,1], outputRange:[0,-40] });
   const playerOrb2Y   = playerOrb2Anim.interpolate({ inputRange:[0,1], outputRange:[0,50] });
 
-  const featuredClasses = homeClasses.filter(c=>c.isFeatured);
-  const subjectClasses  = homeClasses.filter(c=>c.subject===activeSubject);
-  const allSubjects     = [...new Set(homeClasses.map(c=>c.subject))];
+  const featuredClasses = useMemo(() => homeClasses.filter(c => c.isFeatured), [homeClasses]);
+  const subjectClasses  = useMemo(() => homeClasses.filter(c => c.subject === activeSubject), [homeClasses, activeSubject]);
+  const allSubjects     = useMemo(() => [...new Set(homeClasses.map(c => c.subject))], [homeClasses]);
 
-  const trainerInitials = (name: string) => name.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
 
   // ── Purchase handlers ────────────────────────────────────────────────────
   const handleBuyProgram = async (prog: ApiProgram) => {
@@ -757,7 +1041,7 @@ export default function HomeScreen() {
       const paymentData = await RazorpayCheckout.open({
         key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
         name:"BSH Healers", description:prog.title,
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#7c3aed" },
+        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
       });
       await client.post("/payments/verify", {
         razorpayOrderId:paymentData.razorpay_order_id,
@@ -796,7 +1080,7 @@ export default function HomeScreen() {
       const paymentData = await RazorpayCheckout.open({
         key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
         name:"BSH Healers", description:course.title,
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#7c3aed" },
+        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
       });
       await client.post("/payments/verify", {
         razorpayOrderId:paymentData.razorpay_order_id,
@@ -854,8 +1138,8 @@ export default function HomeScreen() {
         educator: c.educator?.name || "BSH Faculty",
         status: "upcoming" as const,
         startLabel: `${c.enrollmentCount || 0} enrolled · ⭐ ${c.rating?.toFixed(1) || "New"}`,
-        price: `₹${Math.round((c.discountPrice || c.price) / 100).toLocaleString("en-IN")}`,
-        originalPrice: c.discountPrice > 0 ? `₹${Math.round(c.price / 100).toLocaleString("en-IN")}` : "",
+        price: fmtINR(c.discountPrice || c.price),
+        originalPrice: c.discountPrice > 0 ? fmtINR(c.price) : "",
         saving: c.discountPrice > 0 ? `${Math.round((1 - c.discountPrice / c.price) * 100)}%` : "",
         category: c.category,
         isActive: ACTIVE_CATS.has(c.category),
@@ -865,19 +1149,8 @@ export default function HomeScreen() {
     return BATCHES.map(b => ({ ...b, thumbUrl:"", _course:null }));
   }, [apiBatches]);
 
-  // Healer search filter
-  const healerResults = useMemo(() => {
-    if (!healerQuery.trim()) return [];
-    const q = healerQuery.toLowerCase();
-    return displayTrainers.filter(tr =>
-      tr.name.toLowerCase().includes(q) ||
-      tr.role.toLowerCase().includes(q) ||
-      tr.subjects.some((s: string) => s.toLowerCase().includes(q))
-    ).slice(0, 6);
-  }, [healerQuery, displayTrainers]);
-
-  // ── Dynamic styles (theme-aware) ─────────────────────────────────────────
-  const s = makeStyles(t, isDark, insets.top, HEADER_H);
+  // ── Dynamic styles (theme-aware, memoised so StyleSheet.create only runs when theme changes) ─────────────────────────────────────────
+  const s = useMemo(() => makeStyles(t, isDark, insets.top, HEADER_H), [t, isDark, insets.top, HEADER_H]);
 
   return (
     <View style={[s.root, { backgroundColor: t.bg }]}>
@@ -888,7 +1161,7 @@ export default function HomeScreen() {
         <View style={s.headerRow}>
           {/* Logo + brand */}
           <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
-            <Image source={bshLogoImg} style={s.headerLogo} resizeMode="contain" />
+            <Image source={bshLogoImg} style={s.headerLogo} contentFit="contain" />
             <View>
               <Text style={s.brandName}>BSH</Text>
               <Text style={s.brandSub}>Healers</Text>
@@ -907,9 +1180,7 @@ export default function HomeScreen() {
             <TouchableOpacity style={[s.consultBtn, {position:"relative"}]} onPress={()=>router.push("/(tabs)/consultation" as any)}>
               <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff"
                 style={{ textShadowColor:"rgba(0,0,0,0.7)", textShadowOffset:{width:0,height:1}, textShadowRadius:6 } as any} />
-              <View style={{position:"absolute",top:0,right:0,width:9,height:9,borderRadius:5,
-                backgroundColor: chatDotGreen ? "#22c55e" : "#ef4444",
-                borderWidth:1.5, borderColor:"rgba(0,0,0,0.6)"}} />
+              <FlashingDot />
             </TouchableOpacity>
 
             {/* Theme toggle */}
@@ -921,10 +1192,10 @@ export default function HomeScreen() {
               />
             </TouchableOpacity>
 
-            {/* Avatar */}
-            <TouchableOpacity onPress={()=>router.push(user ? "/(tabs)/dashboard" : "/(auth)/login")}>
+            {/* Avatar — taps open profile */}
+            <TouchableOpacity onPress={()=>router.push(user ? "/profile" : "/(auth)/login")}>
               {user?.avatar ? (
-                <Image source={{ uri:user.avatar }} style={s.avatar} />
+                <Image source={{ uri:user.avatar }} style={s.avatar} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
                 <View style={s.avatarDefault}>
                   <Text style={s.avatarInitial}>{user?.name?.[0]?.toUpperCase() ?? "B"}</Text>
@@ -940,184 +1211,15 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop:0, paddingBottom:100 }}>
 
-        {/* ═══════════════ HERO: LIVE / UPCOMING SESSIONS CAROUSEL ═══════════════
-             Inspired by SoulSensei: full-bleed trainer photo, countdown timer,
-             attendee count — videos slot in via GCS when uploaded by admin. */}
-        {heroSlides.length > 0 && (
-          /* ── Full-bleed hero carousel (admin banners + live sessions) ── */
-          <View style={{ height: SW * 1.1 + insets.top }}>
-            <FlatList
-              ref={heroRef}
-              data={heroSlides}
-              horizontal pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item._id}
-              getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
-              onScrollToIndexFailed={info => {
-                heroRef.current?.scrollToOffset({ offset: SW * info.index, animated: true });
-              }}
-              onScroll={e => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
-                if (idx !== heroIndex) setHeroIndex(idx);
-              }}
-              scrollEventThrottle={16}
-              renderItem={({ item, index: slideIdx }) => {
-                const isBanner = (item as HeroBannerItem)._type === "banner";
-                const isActiveSlide = slideIdx === heroIndex && isTabFocused;
-
-                // ── Banner slide ──────────────────────────────────────────
-                if (isBanner) {
-                  const b = item as HeroBannerItem;
-                  const badgeLabel = b.showTimer && b.timerEndsAt
-                    ? fmtCountdown(b.timerEndsAt, "scheduled").label
-                    : b.badgeText;
-                  const badgeBg = b.showTimer && b.timerEndsAt
-                    ? fmtCountdown(b.timerEndsAt, "scheduled").bg
-                    : (b.badgeBg || "#7c3aed");
-                  const dest = b.ctaLink || ("/(tabs)/live" as any);
-                  return (
-                    <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
-                      onPress={() => router.push(dest as any)}>
-                      {b.videoUrl ? (
-                        <Video source={{ uri: b.videoUrl }}
-                          style={{ position:"absolute", width:"100%", height:"100%" }}
-                          resizeMode={ResizeMode.COVER}
-                          shouldPlay={isActiveSlide} isLooping isMuted={heroMuted} useNativeControls={false} />
-                      ) : b.thumbnailUrl ? (
-                        <Image source={{ uri: b.thumbnailUrl }} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                      ) : (
-                        <Image source={slide1} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                      )}
-                      <View style={{ position:"absolute", top:0, left:0, right:0, height: insets.top + 90 }}>
-                        <View style={{ flex:1, backgroundColor:"rgba(4,2,14,0.45)" }} />
-                      </View>
-                      <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(6,3,20,0.18)" }} />
-                      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"40%", backgroundColor:"rgba(4,2,14,0.22)" }} />
-                      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"28%", backgroundColor:"rgba(4,2,14,0.46)" }} />
-                      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"16%", backgroundColor:"rgba(4,2,14,0.62)" }} />
-                      {b.videoUrl && (
-                        <TouchableOpacity style={[s.heroMuteBtn, { top: insets.top + 56 }]} onPress={() => setHeroMuted(m => !m)}>
-                          <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={15} color="#fff" />
-                        </TouchableOpacity>
-                      )}
-                      <View style={s.heroOverlay}>
-                        {b.superTitle ? <Text style={s.heroSuperTitle}>{b.superTitle}</Text> : null}
-                        {b.educatorName ? <Text style={s.heroEducatorName}>{b.educatorName}</Text> : null}
-                        <Text style={s.heroSessionTitle} numberOfLines={3}>{b.title}</Text>
-                        {badgeLabel ? (
-                          <View style={[s.heroCountdownBadge, { backgroundColor: badgeBg }]}>
-                            <Text style={s.heroCountdownTxt}>{badgeLabel}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }
-
-                // ── Live session slide ────────────────────────────────────
-                const live = item as LiveHeroSession;
-                const eduObj = typeof live.educator === "object" ? live.educator : null;
-                const eduName = eduObj?.name ?? (typeof live.educator === "string" ? live.educator : "BSH Healer");
-                const countdown = fmtCountdown(live.scheduledAt, live.status);
-                const avatar = eduObj?.avatar ? { uri: eduObj.avatar } : slide1;
-                const heroVideo = (live as any).heroVideoUrl as string | undefined;
-                return (
-                  <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
-                    onPress={() => router.push("/(tabs)/live" as any)}>
-                    {heroVideo ? (
-                      <Video source={{ uri: heroVideo }}
-                        style={{ position:"absolute", width:"100%", height:"100%" }}
-                        resizeMode={ResizeMode.COVER}
-                        shouldPlay={isActiveSlide} isLooping isMuted={heroMuted} useNativeControls={false} />
-                    ) : (
-                      <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                    )}
-                    <View style={{ position:"absolute", top:0, left:0, right:0, height: insets.top + 90 }}>
-                      <View style={{ flex:1, backgroundColor:"rgba(4,2,14,0.45)" }} />
-                    </View>
-                    <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(6,3,20,0.18)" }} />
-                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"40%", backgroundColor:"rgba(4,2,14,0.22)" }} />
-                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"28%", backgroundColor:"rgba(4,2,14,0.46)" }} />
-                    <View style={{ position:"absolute", bottom:0, left:0, right:0, height:"16%", backgroundColor:"rgba(4,2,14,0.62)" }} />
-                    <TouchableOpacity style={[s.heroMuteBtn, { top: insets.top + 56 }]} onPress={() => setHeroMuted(m => !m)}>
-                      <Ionicons name={heroMuted ? "volume-mute" : "volume-high"} size={15} color="#fff" />
-                    </TouchableOpacity>
-                    <View style={s.heroOverlay}>
-                      <Text style={s.heroSuperTitle}>WITH EXPERT HEALERS</Text>
-                      <Text style={s.heroEducatorName}>{eduName}</Text>
-                      <Text style={s.heroSessionTitle} numberOfLines={3}>{live.title}</Text>
-                      <View style={[s.heroCountdownBadge, { backgroundColor: countdown.bg }]}>
-                        <Text style={s.heroCountdownTxt}>{countdown.label}</Text>
-                      </View>
-                      {live.enrolledStudents?.length > 0 && (
-                        <View style={s.heroAttendeeRow}>
-                          {[...live.enrolledStudents].slice(0, 3).map((_, ai) => (
-                            <View key={ai} style={[s.heroAvatarThumb, { left: ai * 16, backgroundColor: ["#7c3aed","#0d9488","#db2777"][ai] }]}>
-                              <Text style={{ color:"#fff", fontSize:8 }}>👤</Text>
-                            </View>
-                          ))}
-                          <Text style={[s.heroAttendeeTxt, { marginLeft: Math.min(live.enrolledStudents.length, 3) * 16 + 8 }]}>
-                            +{live.enrolledStudents.length} Attending
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-            {/* Pagination dots */}
-            <View style={s.heroDotsRow}>
-              {heroSlides.map((_, i) => (
-                <View key={i} style={[s.heroDot, i === heroIndex && s.heroDotActive]} />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ── Floating search bar — overlaps the bottom of the hero ── */}
-        <View style={s.floatingSearchWrap}>
-          <View style={[s.floatingSearch, { backgroundColor: isDark ? "#13103a" : "#ffffff" }]}>
-            <Text style={s.searchIcon}>🔍</Text>
-            <TextInput
-              value={healerQuery}
-              onChangeText={setHealerQuery}
-              placeholder="Search for Healers..."
-              placeholderTextColor={isDark ? "#6b7280" : "#9ca3af"}
-              style={[s.searchPlaceholder, { color: isDark ? "#e5e7eb" : "#111827", flex:1, padding:0 }]}
-              returnKeyType="search"
-            />
-            {healerQuery.length > 0 && (
-              <TouchableOpacity onPress={()=>setHealerQuery("")} hitSlop={{top:8,bottom:8,left:8,right:8}}>
-                <Text style={{color:"#9ca3af",fontSize:15}}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* ═══════════════ SPIRITUAL GUIDANCE FOR EVERY NEED ═══════════════
-             SoulSensei-style 2×3 photo goal grid — person photo background,
-             uppercase text label, tap links to relevant content. */}
-        <View style={{ paddingHorizontal:0, paddingTop:28, paddingBottom:4 }}>
-          <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]} numberOfLines={1}>Spiritual Guidance For Every Need</Text>
-          <View style={s.healNeedGrid}>
-            {[
-              { img: advHypnosisImg, label:"CALM YOUR\nMIND",    cat:"Advance Hypnosis" },
-              { img: shadowWorkImg,  label:"HEAL\nEMOTIONALLY",  cat:"Shadow Work" },
-              { img: akashicImg,     label:"ADVANCE\nYOUR SOUL", cat:"Akashik" },
-              { img: reikiImg,       label:"HEAL\nRELATIONS",    cat:"Reiki" },
-              { img: deepTranceImg,  label:"FIND YOUR\nPURPOSE", cat:"Deep Trance Level" },
-              { img: mesmerismImg,   label:"TRANSFORM\nYOUR LIFE",cat:"Mesmerism" },
-            ].map((g, i) => (
-              <TouchableOpacity key={i} style={s.healNeedTile} activeOpacity={0.85}
-                onPress={() => router.push({ pathname:"/(tabs)/explore", params:{ category:g.cat } })}>
-                <Image source={g.img} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,25,0.42)" }} />
-                <Text style={s.healNeedLabel}>{g.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* ═══════════════ UNIFIED HERO + GUIDANCE EXPERIENCE ═══════════════ */}
+        <HeroCarousel
+          heroSlides={heroSlides}
+          isTabFocused={isTabFocused}
+          isHeroVisible={isHeroVisible}
+          dataReady={lastFetched !== null}
+          s={s}
+          insets={insets}
+        />
 
         {/* ═══════════════ STARTING SOON (countdown cards) ═══════════════
              Admin-managed upcoming class cards with live countdown timers.
@@ -1129,46 +1231,44 @@ export default function HomeScreen() {
               <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]} numberOfLines={1}>Starting Soon</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:12, gap:10 }}>
                 {useAdmin
-                  ? upcomingClasses.map(item => {
-                      const countdown = fmtCountdown(item.scheduledAt, item.status);
+                  ? (upcomingClasses as any[]).map(item => {
                       const src = item.thumbnailUrl ? { uri: item.thumbnailUrl } : slide1;
                       return (
-                        <TouchableOpacity key={item._id} style={s.startSoonCard} activeOpacity={0.88}
-                          onPress={() => router.push((item.ctaLink || "/(tabs)/live") as any)}>
-                          <Image source={src} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                          <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.38)" }} />
-                          <View style={[s.startSoonBadge, { backgroundColor: countdown.bg }]}>
-                            <Text style={s.startSoonBadgeTxt}>{countdown.label}</Text>
-                          </View>
-                          <View style={s.startSoonInfo}>
-                            <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
-                            {item.educatorName ? <Text style={s.startSoonEdu}>{item.educatorName}</Text> : null}
-                            <Text style={s.startSoonDate}>
-                              {new Date(item.scheduledAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
-                            </Text>
+                        <TouchableOpacity key={item._id} activeOpacity={0.88}
+                          onPress={() => router.push({ pathname: "/(tabs)/live" as any, params: { educator: item.educatorName, scheduledAt: item.scheduledAt } })}>
+                          <View style={s.startSoonCard}>
+                            <Image source={src} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" cachePolicy="disk" />
+                            <View style={{ position:"absolute", top:0, right:0, bottom:0, left:0, backgroundColor:"rgba(10,5,30,0.38)" }} />
+                            <CountdownBadge scheduledAt={item.scheduledAt} status={item.status} badgeStyle={s.startSoonBadge} textStyle={s.startSoonBadgeTxt} />
+                            <View style={s.startSoonInfo}>
+                              <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
+                              {item.educatorName ? <Text style={s.startSoonEdu}>{item.educatorName}</Text> : null}
+                              <Text style={s.startSoonDate}>
+                                {fmtShortDateTime(item.scheduledAt)}
+                              </Text>
+                            </View>
                           </View>
                         </TouchableOpacity>
                       );
                     })
-                  : liveHeroSessions.map(item => {
+                  : (liveHeroSessions as any[]).map(item => {
                       const eduObj = typeof item.educator === "object" ? item.educator : null;
                       const eduName = eduObj?.name ?? "BSH Healer";
-                      const countdown = fmtCountdown(item.scheduledAt, item.status);
                       const avatar = eduObj?.avatar ? { uri: eduObj.avatar } : slide1;
                       return (
-                        <TouchableOpacity key={item._id} style={s.startSoonCard} activeOpacity={0.88}
+                        <TouchableOpacity key={item._id} activeOpacity={0.88}
                           onPress={() => router.push("/(tabs)/live" as any)}>
-                          <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover" }} />
-                          <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,30,0.35)" }} />
-                          <View style={[s.startSoonBadge, { backgroundColor: countdown.bg }]}>
-                            <Text style={s.startSoonBadgeTxt}>{countdown.label}</Text>
-                          </View>
-                          <View style={s.startSoonInfo}>
-                            <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
-                            <Text style={s.startSoonEdu}>{eduName}</Text>
-                            <Text style={s.startSoonDate}>
-                              {new Date(item.scheduledAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}
-                            </Text>
+                          <View style={s.startSoonCard}>
+                            <Image source={avatar} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" cachePolicy="disk" />
+                            <View style={{ position:"absolute", top:0, right:0, bottom:0, left:0, backgroundColor:"rgba(10,5,30,0.35)" }} />
+                            <CountdownBadge scheduledAt={item.scheduledAt} status={item.status} badgeStyle={s.startSoonBadge} textStyle={s.startSoonBadgeTxt} />
+                            <View style={s.startSoonInfo}>
+                              <Text style={s.startSoonTitle} numberOfLines={2}>{item.title}</Text>
+                              <Text style={s.startSoonEdu}>{eduName}</Text>
+                              <Text style={s.startSoonDate}>
+                                {fmtShortDateTime(item.scheduledAt)}
+                              </Text>
+                            </View>
                           </View>
                         </TouchableOpacity>
                       );
@@ -1179,69 +1279,29 @@ export default function HomeScreen() {
           );
         })()}
 
-        {/* ═══════════════ GET 1:1 EXPERT GUIDANCE TODAY ═══════════════
-             Thematic icon tiles linking to consultation categories. */}
-        <View style={[s.section, { paddingHorizontal:0 }]}>
-          <Text style={[s.sectionTitle, { paddingHorizontal:16, color:t.text }]} numberOfLines={1}>Get 1:1 Expert Guidance Today</Text>
-          <View style={s.guidance1on1Grid}>
-            {[
-              { img:deepTranceImg,  label:"HYPNO-\nTHERAPY",   spec:"Hypnotherapy" },
-              { img:shadowWorkImg,   label:"SHADOW\nWORK",      spec:"Shadow Work" },
-              { img:reikiImg,        label:"REIKI\nHEALING",   spec:"Reiki" },
-              { img:akashicImg,      label:"AKASHIC\nRECORDS", spec:"Akashik Records" },
-              { img:mesmerismImg,    label:"NLP\nCOACHING",    spec:"NLP Coaching" },
-              { img:advHypnosisImg,  label:"PRANIC\nHEALING",  spec:"Spiritual Healing" },
-            ].map((c, i) => (
-              <TouchableOpacity key={i} style={s.guidanceTile} activeOpacity={0.85}
-                onPress={() => router.push("/(tabs)/consultation" as any)}>
-                <Image source={c.img} style={{ position:"absolute", width:"100%", height:"100%", resizeMode:"cover", borderRadius:12 }} />
-                <View style={{ position:"absolute", inset:0, backgroundColor:"rgba(10,5,25,0.55)", borderRadius:12 }} />
-                <Text style={s.guidanceTileLabel}>{c.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
-        {/* ── Select Your Goal (existing programs/courses — kept for navigation) ── */}
-        <View style={s.section}>
-          <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Select Your Goal</Text>
-          <Text style={[s.sectionSub, {color:t.textMuted}]}>
-            {apiPrograms.length > 0 ? `${apiPrograms.length} programs · admin-managed` : "20+ subjects for your spiritual journey"}
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop:12 }}>
-            {displayGoals.map((g, idx) => (
-              <TouchableOpacity key={idx} style={[s.goalCard, {borderColor:t.border, backgroundColor:t.surface}]}
-                activeOpacity={0.8}
-                onPress={()=>{
-                  if (g.comingSoon) router.push({ pathname:"/coming-soon", params:{ program:g.name } } as any);
-                  else if (g._prog) setProgModal(g._prog);
-                  else router.push({ pathname:"/(tabs)/explore", params:{ category:g.name.replace("\n"," ") } });
-                }}>
-                {g.thumbUrl
-                  ? <Image source={{uri:g.thumbUrl}} style={s.goalImg} />
-                  : <Image source={g.img} style={s.goalImg} />}
-                <View style={s.goalDim} />
-                <View style={s.goalInfo}>
-                  <Text style={s.goalName} numberOfLines={2}>{g.name}</Text>
-                  <Text style={s.goalCount}>{g.count}</Text>
+
+        {/* ── Spiritual Tools ── */}
+        <View style={[s.section, {paddingBottom:6, borderTopWidth:1, borderColor:t.border}]}>
+          <Text style={[s.sectionTitle, {color:t.text}]}>Spiritual Tools</Text>
+          <Text style={[s.sectionSub, {color:t.textMuted}]}>Ancient wisdom for everyday life</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{paddingHorizontal:14, gap:12, paddingTop:10, paddingBottom:4}}>
+            {SPIRITUAL_TOOLS.map(tool => (
+              <TouchableOpacity key={tool.id} activeOpacity={0.85} style={s.spiritCard}
+                onPress={() => router.push(`/${tool.id}` as any)}>
+                {/* Full-bleed image */}
+                <Image source={tool.img} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                {/* Dark gradient overlay at bottom */}
+                <View style={{position:"absolute", bottom:0, left:0, right:0, height:72, backgroundColor:"rgba(0,0,0,0.58)"}} />
+                {/* Label */}
+                <View style={{position:"absolute", bottom:0, left:0, right:0, padding:12}}>
+                  <Text style={{color:"#fff", fontSize:14, fontWeight:"800"}}>{tool.label}</Text>
+                  <Text style={{color:"rgba(255,255,255,0.72)", fontSize:9, marginTop:2}}>{tool.sub}</Text>
                 </View>
-                {g.comingSoon && (
-                  <View style={{position:"absolute",top:6,right:6,backgroundColor:"#f59e0b",borderRadius:6,paddingHorizontal:5,paddingVertical:2}}>
-                    <Text style={{color:"#fff",fontSize:8,fontWeight:"800"}}>SOON</Text>
-                  </View>
-                )}
-                {!g.comingSoon && g.price > 0 && (
-                  <View style={{position:"absolute",top:6,right:6,backgroundColor:"#7c3aed",borderRadius:6,paddingHorizontal:5,paddingVertical:2}}>
-                    <Text style={{color:"#fff",fontSize:8,fontWeight:"800"}}>₹{g.price}</Text>
-                  </View>
-                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity style={[s.seeAllBtn, {borderColor:t.border}]}
-            onPress={()=>router.push("/(tabs)/explore")}>
-            <Text style={[s.seeAllBtnTxt, {color:t.accentLight}]}>See all goals (20+) →</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Most Engaging Classes (API) ── */}
@@ -1252,9 +1312,9 @@ export default function HomeScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop:12 }}>
               {featuredClasses.slice(0,8).map(cls=>(
                 <TouchableOpacity key={cls._id} onPress={()=>handleClassTap(cls)} activeOpacity={0.85}
-                  style={[s.clsCard, {backgroundColor:cls.bgColor||"#1e1b4b"}]}>
+                  style={[s.clsCard, {backgroundColor:cls.bgColor||"#0f2557"}]}>
                   {cls.thumbnailUrl
-                    ? <Image source={{ uri:cls.thumbnailUrl }} style={s.clsThumb} />
+                    ? <Image source={{ uri:cls.thumbnailUrl }} style={s.clsThumb} contentFit="cover" cachePolicy="disk" />
                     : <View style={[s.clsThumb, {backgroundColor:"#2d2a5e",alignItems:"center",justifyContent:"center"}]}><Text style={{fontSize:28}}>🧠</Text></View>}
                   <View style={s.clsBody}>
                     <View style={[s.clsSubjectBadge, {backgroundColor:cls.subjectColor+"33"}]}>
@@ -1268,8 +1328,8 @@ export default function HomeScreen() {
                     </View>
                     {cls.recordingUrl && (
                       <View style={{flexDirection:"row",alignItems:"center",gap:4,marginTop:4}}>
-                        <Ionicons name="play-circle" size={13} color="#a78bfa"/>
-                        <Text style={{color:"#a78bfa",fontSize:11,fontWeight:"600"}}>Watch Recording</Text>
+                        <Ionicons name="play-circle" size={13} color="#60a5fa"/>
+                        <Text style={{color:"#60a5fa",fontSize:11,fontWeight:"600"}}>Watch Recording</Text>
                       </View>
                     )}
                   </View>
@@ -1289,7 +1349,7 @@ export default function HomeScreen() {
                 return (
                   <TouchableOpacity key={subj} onPress={()=>setActiveSubject(subj)}
                     style={[s.subjectTab, active && s.subjectTabActive,
-                      {borderColor: active ? "#7c3aed" : t.border, backgroundColor: active ? "rgba(124,58,237,0.15)" : t.surface}]}>
+                      {borderColor: active ? "#0c2461" : t.border, backgroundColor: active ? "rgba(30,58,138,0.15)" : t.surface}]}>
                     <Text style={[s.subjectTabTxt, {color: active ? t.accentLight : t.textMuted}]}>{subj}</Text>
                   </TouchableOpacity>
                 );
@@ -1298,9 +1358,9 @@ export default function HomeScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {subjectClasses.map(cls=>(
                 <TouchableOpacity key={cls._id} onPress={()=>handleClassTap(cls)} activeOpacity={0.85}
-                  style={[s.clsCard, {backgroundColor:cls.bgColor||"#1e1b4b"}]}>
+                  style={[s.clsCard, {backgroundColor:cls.bgColor||"#0f2557"}]}>
                   {cls.thumbnailUrl
-                    ? <Image source={{ uri:cls.thumbnailUrl }} style={s.clsThumb} />
+                    ? <Image source={{ uri:cls.thumbnailUrl }} style={s.clsThumb} contentFit="cover" cachePolicy="disk" />
                     : <View style={[s.clsThumb, {backgroundColor:"#2d2a5e",alignItems:"center",justifyContent:"center"}]}><Text style={{fontSize:28}}>🧠</Text></View>}
                   <View style={s.clsBody}>
                     <View style={[s.clsSubjectBadge, {backgroundColor:cls.subjectColor+"33"}]}>
@@ -1310,8 +1370,8 @@ export default function HomeScreen() {
                     <Text style={s.clsEducator}>{cls.educator}</Text>
                     {cls.recordingUrl && (
                       <View style={{flexDirection:"row",alignItems:"center",gap:4,marginTop:6}}>
-                        <Ionicons name="play-circle" size={13} color="#a78bfa"/>
-                        <Text style={{color:"#a78bfa",fontSize:11,fontWeight:"600"}}>Watch Recording</Text>
+                        <Ionicons name="play-circle" size={13} color="#60a5fa"/>
+                        <Text style={{color:"#60a5fa",fontSize:11,fontWeight:"600"}}>Watch Recording</Text>
                       </View>
                     )}
                   </View>
@@ -1322,102 +1382,103 @@ export default function HomeScreen() {
         )}
 
         {/* ── Private Healing Session — 15 Trainers ── */}
-        <View style={[s.section, {backgroundColor: isDark ? "#040312" : "#f0fdf4", borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
-          <View style={{flexDirection:"row",alignItems:"center",marginBottom:4}}>
-            <View style={{width:8,height:8,borderRadius:4,backgroundColor:"#a78bfa",marginRight:8}} />
-            <Text style={{color:"#a78bfa",fontSize:11,fontWeight:"700",letterSpacing:1}}>ONE-ON-ONE WITH INDIA'S BEST HEALERS</Text>
-          </View>
+        <View style={[s.section, {backgroundColor: isDark ? "#040312" : "#FFFFFF", borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
           <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Meet Your Personal Healers</Text>
           <Text style={[s.sectionSub, {color:t.textMuted, marginBottom:14}]}>Hand-picked masters — each session is 1-on-1, deeply personal</Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {displayTrainers.map((tr, idx) => {
+          {/* Horizontal FlatList virtualizes off-screen trainer cards — only ~4 rendered at a time */}
+          <FlatList
+            horizontal
+            data={displayTrainers}
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={tr => tr.name}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+            removeClippedSubviews
+            renderItem={({ item: tr }) => {
               const api      = tr._api as ApiTrainer | null;
-              const color    = (api?.trainerColor || tr.color) || "#7c3aed";
+              const color    = (api?.trainerColor || tr.color) || "#0c2461";
               const isOnline = api?.isOnline ?? false;
               const verified = api?.isVerifiedBadge ?? false;
               const priceRs  = (api?.sessionPricePaise ?? 0) > 0 ? Math.round((api!.sessionPricePaise) / 100) : 0;
               const badge    = isOnline ? "ONLINE" : verified ? "VERIFIED" : tr.badge;
-              const badgeColor = isOnline ? "#22c55e" : verified ? "#3b82f6" : badge==="POPULAR" ? "#f59e0b" : badge==="MASTER TRAINER" ? "#7c3aed" : badge==="SPECIALIST" ? "#16a34a" : "#0ea5e9";
+              const badgeColor = isOnline ? "#22c55e" : verified ? "#3b82f6" : badge==="POPULAR" ? "#f59e0b" : badge==="MASTER TRAINER" ? "#0c2461" : badge==="SPECIALIST" ? "#16a34a" : "#0ea5e9";
               const rating   = api?.rating ?? tr.rating;
               const exp      = api?.experience || tr.exp;
               const sessions = api?.sessionsDisplay || tr.sessions;
               const subject  = api?.specialties?.[0] || tr.subjects[0] || "";
               const initials = trainerInitials(tr.name);
               return (
-                <TouchableOpacity key={idx} activeOpacity={0.85}
+                <TouchableOpacity activeOpacity={0.85}
                   onPress={() => router.push("/(tabs)/consultation" as any)}
-                  style={[s.trainerCard, {backgroundColor:t.card, borderColor:t.border}]}>
-                  {/* Photo area */}
-                  <View style={[s.trainerPhotoArea, {backgroundColor:color+"22"}]}>
-                    {LOCAL_IMGS_HOME[tr.name.toLowerCase()]
-                      ? <Image source={LOCAL_IMGS_HOME[tr.name.toLowerCase()]} style={[s.trainerAvatar, {borderColor:color}]} resizeMode="cover" />
-                      : api?.avatar
-                        ? <Image source={{uri: api.avatar}} style={[s.trainerAvatar, {borderColor:color}]} resizeMode="cover" />
-                        : <View style={[s.trainerAvatar, {backgroundColor:color+"44", borderColor:color}]}>
-                            <Text style={[s.trainerAvatarTxt, {color}]}>{initials}</Text>
-                          </View>
-                    }
-                    {isOnline && (
-                      <View style={{position:"absolute",top:8,left:8,flexDirection:"row",alignItems:"center",gap:4,backgroundColor:"rgba(34,197,94,0.18)",borderRadius:10,paddingHorizontal:7,paddingVertical:3}}>
+                  style={s.trainerCard}>
+                  {LOCAL_IMGS_HOME[tr.name.toLowerCase()]
+                    ? <Image source={LOCAL_IMGS_HOME[tr.name.toLowerCase()]} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                    : <View style={[StyleSheet.absoluteFillObject, {backgroundColor:color||"#0c2461", alignItems:"center", justifyContent:"center"}]}>
+                        <Text style={{color:"rgba(255,255,255,0.13)", fontSize:72, fontWeight:"900"}}>{initials}</Text>
+                      </View>
+                  }
+                  {api?.avatar ? <Image source={{uri: api.avatar}} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="memory" /> : null}
+                  {/* Each card is its own <Svg> document — "trGrad" ID is scoped per-Svg, no conflicts */}
+                  <View pointerEvents="none" style={{position:"absolute", bottom:0, left:0, width:152, height:148}}>
+                    <Svg width={152} height={148} viewBox="0 0 152 148" preserveAspectRatio="none">
+                      <Defs>
+                        <SvgGradient id="trGrad" x1="0" y1="0" x2="0" y2="1">
+                          <Stop offset="0" stopColor="#04030e" stopOpacity="0" />
+                          <Stop offset="0.35" stopColor="#04030e" stopOpacity="0.65" />
+                          <Stop offset="1" stopColor="#04030e" stopOpacity="0.97" />
+                        </SvgGradient>
+                      </Defs>
+                      <SvgRect x="0" y="0" width="152" height="148" fill="url(#trGrad)" />
+                    </Svg>
+                  </View>
+                  {isOnline
+                    ? <View style={{position:"absolute",top:8,left:8,flexDirection:"row",alignItems:"center",gap:4,backgroundColor:"rgba(34,197,94,0.22)",borderRadius:10,paddingHorizontal:7,paddingVertical:3}}>
                         <View style={{width:5,height:5,borderRadius:3,backgroundColor:"#22c55e"}} />
                         <Text style={{color:"#22c55e",fontSize:8,fontWeight:"800"}}>LIVE</Text>
                       </View>
-                    )}
-                    <View style={[s.trainerBadge, {backgroundColor:badgeColor}]}>
-                      <Text style={s.trainerBadgeTxt}>{badge}</Text>
-                    </View>
-                    <View style={[s.ratingBadge, {backgroundColor:"rgba(0,0,0,0.6)"}]}>
-                      <Text style={s.ratingTxt}>⭐ {rating || "—"}</Text>
-                    </View>
+                    : <View style={{position:"absolute",top:8,left:8,backgroundColor:badgeColor,borderRadius:7,paddingHorizontal:6,paddingVertical:2}}>
+                        <Text style={{color:"#fff",fontSize:7,fontWeight:"800"}}>{badge}</Text>
+                      </View>
+                  }
+                  <View style={{position:"absolute",top:8,right:8,backgroundColor:"rgba(0,0,0,0.52)",borderRadius:7,paddingHorizontal:5,paddingVertical:2}}>
+                    <Text style={{color:"#fff",fontSize:8,fontWeight:"700"}}>⭐ {rating||"—"}</Text>
                   </View>
-                  {/* Info */}
-                  <View style={s.trainerInfo}>
-                    <View style={{flexDirection:"row",alignItems:"center",gap:5,marginBottom:3}}>
-                      <View style={{width:6,height:6,borderRadius:3,backgroundColor:color}} />
-                      <Text style={{color,fontSize:9,fontWeight:"700",letterSpacing:0.5,textTransform:"uppercase"}} numberOfLines={1}>{subject}</Text>
-                    </View>
-                    <Text style={[s.trainerName, {color:t.text}]} numberOfLines={2}>{tr.name}</Text>
-                    <Text style={[s.trainerRole, {color:t.textMuted}]} numberOfLines={2}>{tr.role}</Text>
-                    <View style={s.trainerStats}>
-                      <View style={s.trainerStat}>
-                        <Text style={[s.trainerStatVal, {color:t.text}]}>{exp || "—"}</Text>
-                        <Text style={[s.trainerStatLabel, {color:t.textMuted}]}>Experience</Text>
-                      </View>
-                      <View style={{width:1, height:28, backgroundColor:t.border}} />
-                      <View style={s.trainerStat}>
-                        <Text style={[s.trainerStatVal, {color:t.text}]}>{sessions || "—"}</Text>
-                        <Text style={[s.trainerStatLabel, {color:t.textMuted}]}>Sessions</Text>
-                      </View>
+                  <View style={{position:"absolute",bottom:0,left:0,right:0,padding:10}}>
+                    <Text style={{color:"#fff",fontSize:12,fontWeight:"800",marginBottom:2}} numberOfLines={1}>{tr.name}</Text>
+                    {subject ? <Text style={{color:"rgba(255,255,255,0.70)",fontSize:9,lineHeight:13,marginBottom:4}} numberOfLines={2}>{subject}</Text> : null}
+                    <View style={{flexDirection:"row",alignItems:"center",gap:4,marginBottom:4}}>
+                      <Text style={{color:"rgba(255,255,255,0.55)",fontSize:8}}>{exp||"—"}</Text>
+                      <Text style={{color:"rgba(255,255,255,0.3)",fontSize:8}}>·</Text>
+                      <Text style={{color:"rgba(255,255,255,0.55)",fontSize:8}}>{sessions||"—"}</Text>
                     </View>
                     {priceRs > 0 && (
-                      <Text style={{color,fontSize:11,fontWeight:"700",marginBottom:6}}>₹{priceRs}/min</Text>
+                      <Text style={{color:"#fbbf24",fontSize:9,fontWeight:"700",marginBottom:4}}>₹{priceRs}/min</Text>
                     )}
-                    <TouchableOpacity style={[s.trainerBookBtn, {backgroundColor:color}]}
+                    <TouchableOpacity
+                      style={{backgroundColor:"rgba(255,255,255,0.16)",borderRadius:8,paddingVertical:5,alignItems:"center",borderWidth:1,borderColor:"rgba(255,255,255,0.28)"}}
                       onPress={() => router.push("/(tabs)/consultation" as any)}>
-                      <Text style={s.trainerBookBtnTxt}>Book Session →</Text>
+                      <Text style={{color:"#fff",fontSize:10,fontWeight:"700"}}>Book Now →</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               );
-            })}
-          </ScrollView>
+            }}
+          />
 
-          <TouchableOpacity style={[s.bigCta, {marginTop:18}]} onPress={() => router.push("/(tabs)/consultation" as any)}>
-            <Text style={s.bigCtaTxt}>✨ Book My Private Healing Session →</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ── Daily Healing Tools ── */}
         <View style={[s.section, {paddingBottom:20}]}>
           <View style={s.healHeader}>
-            <View style={[s.healIcon, {backgroundColor:"#7c3aed"}]}>
+            <View style={[s.healIcon, {backgroundColor:"#0c2461"}]}>
               <Ionicons name="flash" size={22} color="#fff" />
             </View>
             <View style={{flex:1,minWidth:0}}>
               <View style={{flexDirection:"row",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                 <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Daily Healing Tools</Text>
-                <View style={{backgroundColor:"#7c3aed",borderRadius:4,paddingHorizontal:6,paddingVertical:2}}>
+                <View style={{backgroundColor:"#0c2461",borderRadius:4,paddingHorizontal:6,paddingVertical:2}}>
                   <Text style={{color:"#fff",fontSize:8,fontWeight:"800"}}>BSH</Text>
                 </View>
               </View>
@@ -1428,20 +1489,12 @@ export default function HomeScreen() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:14}}>
-            {[{label:"4 Free Tools",color:"#22c55e"},{label:"20K+ Daily Users",color:"#a78bfa"},{label:"Clinically Backed",color:"#60a5fa"},{label:"No App Required",color:"#f59e0b"}].map(p=>(
+            {[{label:"4 Free Tools",color:"#22c55e"},{label:"20K+ Daily Users",color:"#60a5fa"},{label:"Clinically Backed",color:"#60a5fa"},{label:"No App Required",color:"#f59e0b"}].map(p=>(
               <View key={p.label} style={[s.statPill, {borderColor:p.color+"44", backgroundColor:t.statPill}]}>
                 <Text style={[s.statPillTxt, {color:p.color}]}>{p.label}</Text>
               </View>
             ))}
           </ScrollView>
-
-          {/* Search */}
-          <View style={[s.healSearch, {backgroundColor:t.inputBg, borderColor:t.border}]}>
-            <Ionicons name="search-outline" size={16} color={t.textMuted} style={{marginRight:8}} />
-            <TextInput value={healQ} onChangeText={setHealQ}
-              placeholder="Search breathing, meditation, hypnosis..." placeholderTextColor={t.textMuted}
-              style={[s.healSearchInput, {color:t.text}]} />
-          </View>
 
           {/* Category tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:16}}>
@@ -1450,22 +1503,32 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity key={cat} onPress={()=>setHealCat(cat)}
                   style={[s.healCatTab, active && s.healCatTabActive,
-                    {borderColor: active ? "#7c3aed" : t.border, backgroundColor: active ? "rgba(124,58,237,0.15)" : t.surface}]}>
+                    {borderColor: active ? "#0c2461" : t.border, backgroundColor: active ? "rgba(30,58,138,0.15)" : t.surface}]}>
                   <View style={{flexDirection:"row",alignItems:"center",gap:5}}>
-                    <Ionicons name={HEAL_CAT_ICONS[cat]} size={13} color={active ? "#c4b5fd" : t.textMuted} />
-                    <Text style={[s.healCatTxt, {color: active ? "#c4b5fd" : t.textMuted}]}>{cat}</Text>
+                    <Ionicons name={HEAL_CAT_ICONS[cat]} size={13} color={active ? "#93c5fd" : t.textMuted} />
+                    <Text style={[s.healCatTxt, {color: active ? "#93c5fd" : t.textMuted}]}>{cat}</Text>
                   </View>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:16}}>
-            {healFiltered.map(tool=>(
-              <TouchableOpacity key={tool.id} onPress={()=>handleHealTap(tool)} activeOpacity={0.85} style={s.healCard}>
+          {/* FlatList renders only visible healing tool cards instead of all 20 at once */}
+          <FlatList
+            horizontal
+            data={healFiltered}
+            keyExtractor={tool => String(tool.id)}
+            showsHorizontalScrollIndicator={false}
+            style={{marginBottom:16}}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+            removeClippedSubviews
+            renderItem={({ item: tool }) => (
+              <TouchableOpacity onPress={() => handleHealTap(tool)} activeOpacity={0.85} style={s.healCard}>
                 <View style={[s.healCardTop, {backgroundColor:tool.g1}]}>
                   <View style={s.healGradientOverlay} />
-                  <Ionicons name={tool.icon} size={40} color="#fff" />
+                  <MaterialCommunityIcons name={tool.icon as any} size={42} color="#fff" />
                   <View style={s.healTypeBadge}><Text style={s.healTypeTxt}>{tool.type}</Text></View>
                   {tool.free
                     ? <View style={s.healFreeBadge}><Text style={s.healFreeTxt}>✓ FREE</Text></View>
@@ -1491,35 +1554,36 @@ export default function HomeScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            )}
+          />
 
           <TouchableOpacity style={[s.healUpgradeRow, {backgroundColor:t.surface2, borderColor:t.border}]}
             onPress={hasHealingAccess ? undefined : handleUnlockHealingTools} activeOpacity={hasHealingAccess ? 1 : 0.85}>
             <Ionicons name={hasHealingAccess ? "checkmark-circle" : "lock-closed"} size={14}
-              color={hasHealingAccess ? "#22c55e" : "#c4b5fd"} style={{marginRight:8}} />
+              color={hasHealingAccess ? "#22c55e" : "#93c5fd"} style={{marginRight:8}} />
             <Text style={[s.healUpgradeTxt, {flex:1, color:t.textSec}]}>
               {hasHealingAccess ? "All 20 Healing Tools Unlocked ✓" : "Unlock all 20 premium tools — just ₹99 one-time"}
             </Text>
-            {!hasHealingAccess && <Ionicons name="chevron-forward" size={16} color="#a78bfa" />}
+            {!hasHealingAccess && <Ionicons name="chevron-forward" size={16} color="#60a5fa" />}
           </TouchableOpacity>
         </View>
 
         {/* ── Watch Free Live Classes ── */}
-        <View style={[s.section, {backgroundColor: isDark ? "#0c1a14" : "#f0fdf4", borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
+        <View style={[s.section, {backgroundColor: isDark ? "#071528" : "#f8faff", borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
           <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Watch Free Live Classes</Text>
-          <View style={{flexDirection:"row",gap:12,marginTop:10,marginBottom:16,flexWrap:"wrap"}}>
-            {[{icon:"💬",txt:"Chat live with educators"},{icon:"❓",txt:"Interactive Q&A sessions"},{icon:"✓",txt:"Get your doubts cleared"}].map(f=>(
-              <View key={f.txt} style={{flexDirection:"row",alignItems:"center",gap:6}}>
-                <Text style={{fontSize:16}}>{f.icon}</Text>
-                <Text style={{color:t.textSec,fontSize:13}}>{f.txt}</Text>
+          <View style={{flexDirection:"row",gap:8,marginTop:10,marginBottom:16}}>
+            {[
+              { icon:"chatbubble-ellipses" as IoniconName, color:"#0c2461", label:"Live Chat" },
+              { icon:"help-circle"         as IoniconName, color:"#1e3a8a", label:"Q&A" },
+              { icon:"checkmark-circle"    as IoniconName, color:"#0c2461", label:"Doubt Clear" },
+            ].map(f=>(
+              <View key={f.label} style={{flex:1, alignItems:"center", backgroundColor: isDark?"#0f2557":"#eff6ff", borderRadius:12, paddingVertical:10, gap:6, borderWidth:1, borderColor:t.border}}>
+                <Ionicons name={f.icon} size={20} color={f.color} />
+                <Text style={{color:t.text, fontSize:11, fontWeight:"700"}}>{f.label}</Text>
               </View>
             ))}
           </View>
-          <View style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:16}}>
-            <Text style={{color:t.textMuted,fontSize:13}}>20.7K learners watched a class today</Text>
-          </View>
-          <TouchableOpacity style={[s.bigCta, {backgroundColor:"#0d9488"}]}
+          <TouchableOpacity style={[s.bigCta, {backgroundColor:"#0c2461"}]}
             onPress={()=>router.push("/(tabs)/live")}>
             <Ionicons name="play-circle" size={20} color="#fff" style={{marginRight:8}} />
             <Text style={s.bigCtaTxt}>Watch free classes now</Text>
@@ -1529,18 +1593,133 @@ export default function HomeScreen() {
         {/* ── Platform Features ── */}
         <View style={s.section}>
           <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Why 50K+ Students Love BSH</Text>
-          {[
-            { emoji:"📺", bg: isDark?"#1e1b4b":"#ede9fe", title:"Daily live classes",
-              desc:"Chat with educators, ask questions, answer live polls, and get your doubts cleared — all while the class is going on." },
-            { emoji:"📚", bg: isDark?"#064e3b":"#f0fdf4", title:"Practice and revise",
-              desc:"Access recorded lectures, notes and practice sessions for your revision. Learning continues beyond the class." },
-            { emoji:"📱", bg: isDark?"#7c2d12":"#fff7ed", title:"Learn anytime, anywhere",
-              desc:"One subscription gets you access to all live and recorded classes, on any of your devices." },
-          ].map(f=>(
-            <View key={f.title} style={[s.featureCard, {backgroundColor:f.bg, borderColor:t.border}]}>
-              <Text style={{fontSize:36,marginBottom:10}}>{f.emoji}</Text>
-              <Text style={[s.featureTitle, {color:t.text}]}>{f.title}</Text>
-              <Text style={[s.featureDesc, {color:t.textMuted}]}>{f.desc}</Text>
+          <View style={{flexDirection:"row", gap:8, marginTop:4}}>
+            {[
+              { icon:"videocam"        as IoniconName, iconColor:"#0c2461", bg: isDark?"#0f2557":"#eff6ff", title:"Live Classes",    desc:"Daily live sessions with Q&A" },
+              { icon:"library-outline" as IoniconName, iconColor:"#0c2461", bg: isDark?"#0f2557":"#f0f6ff", title:"Practice",        desc:"Notes, recordings & revision" },
+              { icon:"cloud-done"      as IoniconName, iconColor:"#1e3a8a", bg: isDark?"#0f2557":"#dbeafe", title:"Learn Anywhere",  desc:"All devices, anytime access" },
+            ].map(f=>(
+              <View key={f.title} style={{flex:1, backgroundColor:f.bg, borderRadius:14, padding:12, borderWidth:1, borderColor:t.border, alignItems:"flex-start"}}>
+                <View style={{width:36, height:36, borderRadius:10, backgroundColor:f.iconColor+"22", alignItems:"center", justifyContent:"center", marginBottom:8}}>
+                  <Ionicons name={f.icon} size={18} color={f.iconColor} />
+                </View>
+                <Text style={{color:t.text, fontSize:12, fontWeight:"800", marginBottom:4, lineHeight:16}}>{f.title}</Text>
+                <Text style={{color:t.textMuted, fontSize:11, lineHeight:15}}>{f.desc}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* ── Popular Batches (dynamic from admin courses) ── */}
+        <View style={[s.section, {marginTop:8}]}>
+          <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <View>
+              <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Popular Batches</Text>
+              <Text style={[s.sectionSub, {color:t.textMuted}]}>
+                {apiBatches.length > 0 ? "Live from admin · Razorpay enabled" : "Hand-picked by our educators"}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={()=>router.push("/(tabs)/explore")}>
+              <Text style={{color:"#0c2461",fontSize:13,fontWeight:"700"}}>View all →</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{paddingBottom:4, paddingRight:4}}>
+            {displayBatches.map(batch=>{
+              const active = batch.isActive !== false;
+              return (
+              <View key={batch.id} style={{width:264, borderRadius:16, overflow:"hidden", borderWidth:1,
+                marginRight:14, backgroundColor:t.card, borderColor: active ? t.border : "#111128"}}>
+                <View style={{height:140, position:"relative"}}>
+                  {batch.thumbUrl
+                    ? <Image source={{uri:batch.thumbUrl}} style={[s.batchImg, !active && {opacity:0.4}]} contentFit="cover" cachePolicy="disk" />
+                    : <Image source={batch.img} style={[s.batchImg, !active && {opacity:0.4}]} contentFit="cover" />}
+                  <View style={s.batchImgDim} />
+                  {!active && (
+                    <View style={s.batchComingSoonOverlay}>
+                      <View style={s.batchComingSoonPill}>
+                        <Ionicons name="lock-closed" size={11} color="#94a3b8" />
+                        <Text style={s.batchComingSoonPillTxt}>COMING SOON</Text>
+                      </View>
+                    </View>
+                  )}
+                  {active && (batch.status as string)==="ongoing" && (
+                    <View style={s.ongoingBadge}>
+                      <View style={s.redDot} />
+                      <Text style={s.ongoingTxt}>Live</Text>
+                    </View>
+                  )}
+                  {active && batch._course && (
+                    <View style={{position:"absolute",top:10,right:10,backgroundColor:"rgba(30,58,138,0.9)",borderRadius:8,paddingHorizontal:8,paddingVertical:4}}>
+                      <Text style={{color:"#fff",fontSize:9,fontWeight:"800"}}>ADMIN MANAGED</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={[s.batchBody, !active && {opacity:0.5}]}>
+                  <View style={{flexDirection:"row",flexWrap:"wrap",gap:6,marginBottom:8}}>
+                    {batch.tags.map(tag=>(
+                      <View key={tag} style={[s.tag, {backgroundColor:t.surface2, borderColor:t.border}]}>
+                        <Text style={[s.tagTxt, {color:t.textMuted}]}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={[s.batchTitle, {color:t.text}]} numberOfLines={2}>{batch.title}</Text>
+                  <Text style={[s.batchEducator, {color:t.textMuted}]}>by {batch.educator}</Text>
+                  <Text style={[s.batchStatus, {color:"#0c2461"}]}>{batch.startLabel}</Text>
+                  <View style={[s.batchDivider, {backgroundColor:t.border}]} />
+                  <View style={{flexDirection:"row",alignItems:"center",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                    <Text style={[s.batchPrice, {color:t.text}]}>{batch.price}</Text>
+                    {batch.originalPrice ? <Text style={[s.originalPrice, {color:t.textMuted}]}>{batch.originalPrice}</Text> : null}
+                    {batch.saving ? (
+                      <View style={{backgroundColor:"#22c55e22",borderRadius:6,paddingHorizontal:6,paddingVertical:2}}>
+                        <Text style={{color:"#22c55e",fontSize:10,fontWeight:"700"}}>SAVE {batch.saving}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {active ? (
+                    <>
+                      <View style={{flexDirection:"row",gap:8}}>
+                        <TouchableOpacity style={[s.buyBtn, {backgroundColor:"#0c2461"}]}
+                          onPress={()=>{
+                            const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
+                            if (slug) router.push(`/program/${slug}` as any);
+                            else if (batch._course) setBatchModal(batch._course);
+                            else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
+                          }}>
+                          <Text style={s.buyBtnTxt}>Enroll Now</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.detailBtn, {borderColor:t.border}]}
+                          onPress={()=>{
+                            const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
+                            if (slug) router.push(`/program/${slug}` as any);
+                            else if (batch._course) setBatchModal(batch._course);
+                            else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
+                          }}>
+                          <Text style={[s.detailBtnTxt, {color:t.text}]}>View Details</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity style={{marginTop:10}} onPress={()=>setBookModal("freeCall")}>
+                        <Text style={{color:t.textMuted,fontSize:11}}>Questions? <Text style={{color:"#0c2461",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <View style={s.batchComingSoonBtn}>
+                      <Text style={s.batchComingSoonBtnTxt}>Coming Soon</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* ── Stats Strip ── */}
+        <View style={[s.statsRow, {backgroundColor:t.surface, borderTopWidth:1, borderBottomWidth:1, borderColor:t.border}]}>
+          {[{value:"20+",label:"Subjects"},{value:"50K+",label:"Students"},{value:"500+",label:"Live Classes"},{value:"1M+",label:"Mins Watched"}].map(stat=>(
+            <View key={stat.label} style={s.statItem}>
+              <Text style={[s.statValue, {color:"#0c2461"}]}>{stat.value}</Text>
+              <Text style={[s.statLabel, {color:t.textMuted}]}>{stat.label}</Text>
             </View>
           ))}
         </View>
@@ -1555,197 +1734,80 @@ export default function HomeScreen() {
               </View>
             ))}
           </ScrollView>
-          {EDUCATORS.map((e,idx)=>(
-            <View key={idx} style={[s.eduCard, {backgroundColor:t.card, borderColor:t.border}]}>
-              <View style={[s.eduPhotoWrap, e.imgBg ? {backgroundColor:e.imgBg} : undefined]}>
-                <Image source={e.img} style={s.eduPhoto} resizeMode={e.resizeMode} />
-                <View style={[s.eduBadgeLabel, {backgroundColor:e.badge==="MASTER"?"#7c3aed":"#0d9488"}]}>
-                  <Text style={{color:"#fff",fontSize:9,fontWeight:"700"}}>⭐ {e.badge}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{paddingBottom:4, paddingRight:4}}>
+            {EDUCATORS.map((e,idx)=>(
+              <View key={idx} style={{width:192, borderRadius:16, overflow:"hidden", borderWidth:1,
+                backgroundColor:t.card, borderColor:t.border, marginRight:12}}>
+                <View style={{height:156, backgroundColor: e.imgBg || t.surface2}}>
+                  <Image source={e.img} style={{width:"100%",height:"100%"}} contentFit={e.resizeMode} />
+                  <View style={{position:"absolute",bottom:0,left:0,right:0,
+                    backgroundColor:"#0c2461",alignItems:"center",paddingVertical:5}}>
+                    <Text style={{color:"#fff",fontSize:9,fontWeight:"700"}}>⭐ {e.badge}</Text>
+                  </View>
+                </View>
+                <View style={{padding:12}}>
+                  <Text style={{color:t.text,fontSize:14,fontWeight:"800",marginBottom:2}} numberOfLines={1}>{e.name}</Text>
+                  <Text style={{color:"#0c2461",fontSize:11,fontWeight:"600",marginBottom:6}} numberOfLines={1}>{e.subject}</Text>
+                  {e.slug && (
+                    <View style={{flexDirection:"row",gap:12,marginBottom:8}}>
+                      <View><Text style={{color:t.text,fontSize:12,fontWeight:"800"}}>{e.watchMins}</Text><Text style={{color:t.textMuted,fontSize:10}}>Watch Mins</Text></View>
+                      <View><Text style={{color:t.text,fontSize:12,fontWeight:"800"}}>{e.followers}</Text><Text style={{color:t.textMuted,fontSize:10}}>Followers</Text></View>
+                    </View>
+                  )}
+                  <TouchableOpacity style={{marginTop:2}} onPress={()=>{
+                    if (e.slug) router.push(`/educator/${e.slug}` as any);
+                    else router.push("/(tabs)/consultation" as any);
+                  }}>
+                    <Text style={{color:"#0c2461",fontSize:12,fontWeight:"700"}}>{e.slug ? "View Profile →" : "View Profiles →"}</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <View style={s.eduInfo}>
-                <Text style={[s.eduName, {color:t.text}]}>{e.name}</Text>
-                <Text style={{color:"#7c3aed",fontSize:12,fontWeight:"600",marginBottom:4}}>{e.subject}</Text>
-                <Text style={[s.eduBio, {color:t.textMuted}]} numberOfLines={3}>{e.bio}</Text>
-                {e.slug && (
-                  <View style={{flexDirection:"row",gap:16,marginTop:8}}>
-                    <View><Text style={[s.eduStat, {color:t.text}]}>{e.watchMins}</Text><Text style={{color:t.textMuted,fontSize:10}}>Watch Mins</Text></View>
-                    <View><Text style={[s.eduStat, {color:t.text}]}>{e.followers}</Text><Text style={{color:t.textMuted,fontSize:10}}>Followers</Text></View>
-                  </View>
-                )}
-                <TouchableOpacity style={{marginTop:8}} onPress={()=>{
-                  if (e.slug) router.push(`/educator/${e.slug}` as any);
-                  else router.push("/(tabs)/consultation" as any);
-                }}>
-                  <Text style={{color:"#7c3aed",fontSize:12,fontWeight:"700"}}>{e.slug ? "View Profile →" : "View Profiles →"}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* ── Stats Strip ── */}
-        <View style={[s.statsRow, {backgroundColor:t.surface, borderTopWidth:1, borderBottomWidth:1, borderColor:t.border}]}>
-          {[{value:"20+",label:"Subjects"},{value:"50K+",label:"Students"},{value:"500+",label:"Live Classes"},{value:"1M+",label:"Mins Watched"}].map(stat=>(
-            <View key={stat.label} style={s.statItem}>
-              <Text style={[s.statValue, {color:"#7c3aed"}]}>{stat.value}</Text>
-              <Text style={[s.statLabel, {color:t.textMuted}]}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* ── Popular Batches (dynamic from admin courses) ── */}
-        <View style={[s.section, {marginTop:8}]}>
-          <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <View>
-              <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Popular Batches</Text>
-              <Text style={[s.sectionSub, {color:t.textMuted}]}>
-                {apiBatches.length > 0 ? "Live from admin · Razorpay enabled" : "Hand-picked by our educators"}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={()=>router.push("/(tabs)/explore")}>
-              <Text style={{color:"#7c3aed",fontSize:13,fontWeight:"700"}}>View all →</Text>
-            </TouchableOpacity>
-          </View>
-          {displayBatches.map(batch=>{
-            const active = batch.isActive !== false;
-            return (
-            <View key={batch.id} style={[s.batchCard, {backgroundColor:t.card, borderColor: active ? t.border : "#111128"}]}>
-              <View style={s.batchImgWrapper}>
-                {batch.thumbUrl
-                  ? <Image source={{uri:batch.thumbUrl}} style={[s.batchImg, !active && {opacity:0.4}]} />
-                  : <Image source={batch.img} style={[s.batchImg, !active && {opacity:0.4}]} />}
-                <View style={s.batchImgDim} />
-                {/* Coming Soon overlay for inactive batches */}
-                {!active && (
-                  <View style={s.batchComingSoonOverlay}>
-                    <View style={s.batchComingSoonPill}>
-                      <Ionicons name="lock-closed" size={11} color="#94a3b8" />
-                      <Text style={s.batchComingSoonPillTxt}>COMING SOON</Text>
-                    </View>
-                  </View>
-                )}
-                {active && (batch.status as string)==="ongoing" && (
-                  <View style={s.ongoingBadge}>
-                    <View style={s.redDot} />
-                    <Text style={s.ongoingTxt}>Live</Text>
-                  </View>
-                )}
-                {active && batch._course && (
-                  <View style={{position:"absolute",top:10,right:10,backgroundColor:"rgba(124,58,237,0.9)",borderRadius:8,paddingHorizontal:8,paddingVertical:4}}>
-                    <Text style={{color:"#fff",fontSize:9,fontWeight:"800"}}>ADMIN MANAGED</Text>
-                  </View>
-                )}
-              </View>
-              <View style={[s.batchBody, !active && {opacity:0.5}]}>
-                <View style={{flexDirection:"row",flexWrap:"wrap",gap:6,marginBottom:8}}>
-                  {batch.tags.map(tag=>(
-                    <View key={tag} style={[s.tag, {backgroundColor:t.surface2, borderColor:t.border}]}>
-                      <Text style={[s.tagTxt, {color:t.textMuted}]}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-                <Text style={[s.batchTitle, {color:t.text}]}>{batch.title}</Text>
-                <Text style={[s.batchEducator, {color:t.textMuted}]}>by {batch.educator}</Text>
-                <Text style={[s.batchStatus, {color:"#7c3aed"}]}>{batch.startLabel}</Text>
-                <View style={[s.batchDivider, {backgroundColor:t.border}]} />
-                <View style={{flexDirection:"row",alignItems:"center",gap:10,marginBottom:12}}>
-                  <Text style={[s.batchPrice, {color:t.text}]}>{batch.price}</Text>
-                  {batch.originalPrice ? <Text style={[s.originalPrice, {color:t.textMuted}]}>{batch.originalPrice}</Text> : null}
-                  {batch.saving ? (
-                    <View style={{backgroundColor:"#22c55e22",borderRadius:6,paddingHorizontal:8,paddingVertical:3}}>
-                      <Text style={{color:"#22c55e",fontSize:10,fontWeight:"700"}}>SAVE {batch.saving}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {active ? (
-                  <>
-                    <View style={{flexDirection:"row",gap:10}}>
-                      <TouchableOpacity style={[s.buyBtn, {backgroundColor:"#7c3aed"}]}
-                        onPress={()=>{
-                          const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
-                          if (slug) router.push(`/program/${slug}` as any);
-                          else if (batch._course) setBatchModal(batch._course);
-                          else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
-                        }}>
-                        <Text style={s.buyBtnTxt}>Enroll Now</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[s.detailBtn, {borderColor:t.border}]}
-                        onPress={()=>{
-                          const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
-                          if (slug) router.push(`/program/${slug}` as any);
-                          else if (batch._course) setBatchModal(batch._course);
-                          else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
-                        }}>
-                        <Text style={[s.detailBtnTxt, {color:t.text}]}>View Details</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity style={{marginTop:10}} onPress={()=>setBookModal("freeCall")}>
-                      <Text style={{color:t.textMuted,fontSize:12}}>Have questions? <Text style={{color:"#7c3aed",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <View style={s.batchComingSoonBtn}>
-                    <Text style={s.batchComingSoonBtnTxt}>Coming Soon</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            );
-          })}
+            ))}
+          </ScrollView>
         </View>
 
         {/* ── Testimonials ── */}
         <View style={[s.section, {backgroundColor:t.surface2, borderTopWidth:1, borderBottomWidth:1, borderColor:t.border, paddingVertical:20}]}>
           <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>What Our Students Say</Text>
           <Text style={[s.sectionSub, {color:t.textMuted, marginBottom:14}]}>Real experiences from our learners</Text>
-          {TESTIMONIALS.map(tm=>(
-            <View key={tm.name} style={[s.testimonialCard, {backgroundColor:t.card, borderColor:t.border}]}>
-              <Text style={{color:"#f59e0b",fontSize:13,marginBottom:8}}>★★★★★</Text>
-              <Text style={[s.testimonialText, {color:t.textSec}]}>"{tm.text}"</Text>
-              <View style={{flexDirection:"row",alignItems:"center",gap:10,marginTop:12}}>
-                <View style={[s.testimonialAvatar, {backgroundColor:tm.color}]}>
-                  <Text style={{color:"#fff",fontWeight:"800",fontSize:14}}>{tm.init}</Text>
-                </View>
-                <View>
-                  <Text style={[s.testimonialName, {color:t.text}]}>{tm.name}</Text>
-                  <Text style={{color:t.textMuted,fontSize:11}}>{tm.subject}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{paddingBottom:4, paddingRight:4}}>
+            {TESTIMONIALS.map(tm=>(
+              <View key={tm.name} style={{width:264, borderRadius:16, padding:16, borderWidth:1,
+                marginRight:12, backgroundColor:t.card, borderColor:t.border}}>
+                <Text style={{color:"#f59e0b",fontSize:14,marginBottom:8,letterSpacing:1}}>★★★★★</Text>
+                <Text style={[s.testimonialText, {color:t.textSec}]} numberOfLines={5}>"{tm.text}"</Text>
+                <View style={{flexDirection:"row",alignItems:"center",gap:10,marginTop:14}}>
+                  <View style={[s.testimonialAvatar, {backgroundColor:tm.color}]}>
+                    <Text style={{color:"#fff",fontWeight:"800",fontSize:14}}>{tm.init}</Text>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={[s.testimonialName, {color:t.text}]} numberOfLines={1}>{tm.name}</Text>
+                    <Text style={{color:t.textMuted,fontSize:11}}>{tm.subject}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </ScrollView>
         </View>
 
-        {/* ── Become an Educator ── */}
-        <View style={[s.section, {paddingBottom:20}]}>
-          <View style={s.becomeEduCard}>
-            <Text style={{color:"rgba(255,255,255,0.7)",fontSize:12,marginBottom:6}}>FOR PRACTITIONERS & COACHES</Text>
-            <Text style={[s.sectionTitle, {color:"#fff",fontSize:24}]}>Become an Educator</Text>
-            <Text style={{color:"rgba(255,255,255,0.75)",fontSize:14,lineHeight:20,marginBottom:18}}>
-              Share your knowledge, earn money. Join 5,000+ educators teaching on BSH Healers.
-            </Text>
-            <TouchableOpacity style={{backgroundColor:"#fff",borderRadius:12,paddingHorizontal:24,paddingVertical:12,alignSelf:"flex-start"}}
-              onPress={()=>router.push("/(auth)/login")}>
-              <Text style={{color:"#7c3aed",fontWeight:"800",fontSize:14}}>Start Teaching Today →</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* ── Social Links ── */}
-        <View style={[s.section, {alignItems:"center",paddingBottom:20}]}>
-          <Text style={[{color:t.textMuted,fontSize:13,marginBottom:14}]}>Follow Dr. Pradeep Kumar</Text>
-          <View style={{flexDirection:"row",flexWrap:"wrap",justifyContent:"center",gap:12}}>
+        <View style={{alignItems:"center", paddingVertical:10, paddingHorizontal:16}}>
+          <Text style={{color:t.textMuted, fontSize:11, marginBottom:8, letterSpacing:0.5}}>Follow BSH</Text>
+          <View style={{flexDirection:"row", justifyContent:"center", gap:6}}>
             {[
-              { icon:"logo-youtube"    as IoniconName, color:"#ff0000", url:"https://www.youtube.com/@drpradeepkumar3912", label:"YouTube" },
-              { icon:"logo-instagram"  as IoniconName, color:"#e1306c", url:"https://www.instagram.com/drpradeepkumarofficial/", label:"Instagram" },
-              { icon:"logo-facebook"   as IoniconName, color:"#1877f2", url:"https://www.facebook.com/drpradeepkumar", label:"Facebook" },
-              { icon:"globe-outline"   as IoniconName, color:"#7c3aed", url:"https://blessingsschoolofhypnosis.com", label:"Website" },
-              { icon:"logo-linkedin"   as IoniconName, color:"#0a66c2", url:"https://www.linkedin.com/in/drpradeepkumar3912", label:"LinkedIn" },
-              { icon:"logo-twitter"    as IoniconName, color:"#1da1f2", url:"https://x.com/pradeep23923", label:"Twitter/X" },
+              { icon:"logo-youtube"    as IoniconName, color:"#ff0000", url:"https://www.youtube.com/@drpradeepkumar3912" },
+              { icon:"logo-instagram"  as IoniconName, color:"#e1306c", url:"https://www.instagram.com/drpradeepkumarofficial/" },
+              { icon:"logo-facebook"   as IoniconName, color:"#1877f2", url:"https://www.facebook.com/drpradeepkumar" },
+              { icon:"globe-outline"   as IoniconName, color:"#0c2461", url:"https://blessingsschoolofhypnosis.com" },
+              { icon:"logo-linkedin"   as IoniconName, color:"#0a66c2", url:"https://www.linkedin.com/in/drpradeepkumar3912" },
+              { icon:"logo-twitter"    as IoniconName, color:"#1da1f2", url:"https://x.com/pradeep23923" },
             ].map(soc=>(
               <TouchableOpacity key={soc.url} onPress={()=>Linking.openURL(soc.url).catch(()=>{})}
-                style={[s.socialBtn, {borderColor:soc.color+"44"}]}>
-                <Ionicons name={soc.icon} size={22} color={soc.color} />
+                style={{width:34, height:34, borderRadius:17, alignItems:"center", justifyContent:"center", borderWidth:1, borderColor:soc.color+"44"}}>
+                <Ionicons name={soc.icon} size={16} color={soc.color} />
               </TouchableOpacity>
             ))}
           </View>
@@ -1753,82 +1815,20 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      {/* ── Healer Search Dropdown ── */}
-      {healerResults.length > 0 && (
-        <View style={{position:"absolute",top: SW * 1.1 + insets.top + 50,left:0,right:0,zIndex:200,
-          backgroundColor:isDark?"#1e1b4b":"#fff",
-          borderBottomLeftRadius:16,borderBottomRightRadius:16,
-          shadowColor:"#000",shadowOpacity:0.2,shadowRadius:12,elevation:10,
-          borderWidth:1,borderColor:t.border,maxHeight:380}}>
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={{color:t.textMuted,fontSize:10,fontWeight:"700",paddingHorizontal:16,paddingTop:12,paddingBottom:4,letterSpacing:1}}>
-              HEALERS MATCHING "{healerQuery.toUpperCase()}"
-            </Text>
-            {healerResults.map((tr, idx) => {
-              const api = tr._api as ApiTrainer | null;
-              const color = (api?.trainerColor || tr.color) || "#7c3aed";
-              const localImg = LOCAL_IMGS_HOME[tr.name.toLowerCase()];
-              return (
-                <TouchableOpacity key={idx}
-                  style={{flexDirection:"row",alignItems:"center",gap:12,paddingHorizontal:16,paddingVertical:12,
-                    borderTopWidth:idx>0?1:0,borderTopColor:t.border}}
-                  onPress={()=>{ setHealerQuery(""); router.push("/(tabs)/consultation" as any); }}>
-                  {/* Avatar */}
-                  <View style={{width:44,height:44,borderRadius:22,overflow:"hidden",borderWidth:2,borderColor:color}}>
-                    {localImg
-                      ? <Image source={localImg} style={{width:44,height:44}} resizeMode="cover" />
-                      : api?.avatar
-                        ? <Image source={{uri:api.avatar}} style={{width:44,height:44}} resizeMode="cover" />
-                        : <View style={{width:44,height:44,backgroundColor:color+"44",alignItems:"center",justifyContent:"center"}}>
-                            <Text style={{color,fontSize:16,fontWeight:"900"}}>{trainerInitials(tr.name)}</Text>
-                          </View>}
-                  </View>
-                  {/* Info */}
-                  <View style={{flex:1,minWidth:0}}>
-                    <View style={{flexDirection:"row",alignItems:"center",gap:6}}>
-                      <Text style={{color:t.text,fontSize:14,fontWeight:"800"}} numberOfLines={1}>{tr.name}</Text>
-                      {api?.isOnline && <View style={{width:6,height:6,borderRadius:3,backgroundColor:"#22c55e"}} />}
-                    </View>
-                    <Text style={{color:t.textMuted,fontSize:11}} numberOfLines={1}>{tr.role}</Text>
-                    {tr.subjects[0] && (
-                      <View style={{alignSelf:"flex-start",backgroundColor:color+"20",borderRadius:8,paddingHorizontal:7,paddingVertical:2,marginTop:3}}>
-                        <Text style={{color,fontSize:9,fontWeight:"700"}}>{tr.subjects[0]}</Text>
-                      </View>
-                    )}
-                  </View>
-                  {/* Price + arrow */}
-                  <View style={{alignItems:"flex-end",gap:3}}>
-                    {(api?.sessionPricePaise ?? 0) > 0 && (
-                      <Text style={{color,fontSize:11,fontWeight:"700"}}>₹{Math.round(api!.sessionPricePaise/100)}/min</Text>
-                    )}
-                    <Text style={{color:"#7c3aed",fontSize:12,fontWeight:"700"}}>Book →</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={{padding:14,alignItems:"center",borderTopWidth:1,borderTopColor:t.border}}
-              onPress={()=>{ setHealerQuery(""); router.push("/(tabs)/consultation" as any); }}>
-              <Text style={{color:"#7c3aed",fontSize:13,fontWeight:"700"}}>See all healers →</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      )}
-
       {/* ── Program Purchase Modal ── */}
       <Modal visible={progModal!==null} transparent animationType="slide" onRequestClose={()=>setProgModal(null)}>
         <View style={{flex:1,backgroundColor:"rgba(0,0,0,0.7)",justifyContent:"flex-end"}}>
-          <View style={{backgroundColor:isDark?"#12103a":"#fff",borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"85%"}}>
+          <View style={{backgroundColor:isDark?"#071223":"#fff",borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"85%"}}>
             {/* Header */}
-            <View style={{backgroundColor:"#7c3aed",borderTopLeftRadius:24,borderTopRightRadius:24,padding:22,paddingBottom:18}}>
+            <View style={{backgroundColor:"#0c2461",borderTopLeftRadius:24,borderTopRightRadius:24,padding:22,paddingBottom:18}}>
               <TouchableOpacity style={{position:"absolute",top:14,right:16,zIndex:5}}
                 onPress={()=>setProgModal(null)}>
                 <Text style={{color:"rgba(255,255,255,0.7)",fontSize:20}}>✕</Text>
               </TouchableOpacity>
               {progModal?.thumbnail
-                ? <Image source={{uri:progModal.thumbnail}} style={{width:"100%",height:120,borderRadius:12,marginBottom:14}} resizeMode="cover" />
+                ? <Image source={{uri:progModal.thumbnail}} style={{width:"100%",height:120,borderRadius:12,marginBottom:14}} contentFit="cover" cachePolicy="disk" />
                 : <Image source={PROG_IMG[progModal?.programId||""] || advHypnosisImg}
-                    style={{width:"100%",height:120,borderRadius:12,marginBottom:14}} resizeMode="cover" />}
+                    style={{width:"100%",height:120,borderRadius:12,marginBottom:14}} contentFit="cover" />}
               <View style={{backgroundColor:"rgba(255,255,255,0.2)",alignSelf:"flex-start",borderRadius:8,paddingHorizontal:10,paddingVertical:4,marginBottom:8}}>
                 <Text style={{color:"#fff",fontSize:10,fontWeight:"800"}}>✦ {progModal?.programType || "FULL PROGRAM"}</Text>
               </View>
@@ -1851,15 +1851,15 @@ export default function HomeScreen() {
                 </View>
               )}
               {/* Price + CTA */}
-              <View style={{backgroundColor:isDark?"#1e1b4b":"#f5f3ff",borderRadius:16,padding:16,marginBottom:16}}>
+              <View style={{backgroundColor:isDark?"#0f2557":"#ffffff",borderRadius:16,padding:16,marginBottom:16}}>
                 <View style={{flexDirection:"row",alignItems:"center",gap:12,marginBottom:14}}>
                   {progModal && progModal.discountPrice > 0 && (
                     <Text style={{color:t.textMuted,fontSize:14,textDecorationLine:"line-through"}}>
-                      ₹{Math.round(progModal.price/100).toLocaleString("en-IN")}
+                      {fmtINR(progModal.price)}
                     </Text>
                   )}
-                  <Text style={{color:"#7c3aed",fontSize:28,fontWeight:"900"}}>
-                    ₹{progModal ? Math.round((progModal.discountPrice||progModal.price)/100).toLocaleString("en-IN") : 0}
+                  <Text style={{color:"#0c2461",fontSize:28,fontWeight:"900"}}>
+                    {progModal ? fmtINR(progModal.discountPrice||progModal.price) : "₹0"}
                   </Text>
                   {progModal && progModal.discountPrice > 0 && (
                     <View style={{backgroundColor:"#22c55e22",borderRadius:6,paddingHorizontal:8,paddingVertical:3}}>
@@ -1870,7 +1870,7 @@ export default function HomeScreen() {
                   )}
                 </View>
                 <TouchableOpacity
-                  style={{backgroundColor:"#7c3aed",borderRadius:14,paddingVertical:14,alignItems:"center",
+                  style={{backgroundColor:"#0c2461",borderRadius:14,paddingVertical:14,alignItems:"center",
                     opacity:purchaseLoading?0.7:1}}
                   onPress={()=>progModal && handleBuyProgram(progModal)}
                   disabled={purchaseLoading}>
@@ -1881,7 +1881,7 @@ export default function HomeScreen() {
                 <Text style={{color:t.textMuted,fontSize:11,textAlign:"center",marginTop:8}}>Secure payment via Razorpay · GHL synced</Text>
               </View>
               <TouchableOpacity style={{alignItems:"center",paddingBottom:20}} onPress={()=>setBookModal("freeCall")}>
-                <Text style={{color:t.textMuted,fontSize:13}}>Have questions? <Text style={{color:"#7c3aed",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
+                <Text style={{color:t.textMuted,fontSize:13}}>Have questions? <Text style={{color:"#0c2461",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1891,15 +1891,15 @@ export default function HomeScreen() {
       {/* ── Batch / Course Purchase Modal ── */}
       <Modal visible={batchModal!==null} transparent animationType="slide" onRequestClose={()=>setBatchModal(null)}>
         <View style={{flex:1,backgroundColor:"rgba(0,0,0,0.7)",justifyContent:"flex-end"}}>
-          <View style={{backgroundColor:isDark?"#12103a":"#fff",borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"82%"}}>
-            <View style={{backgroundColor:"#0d9488",borderTopLeftRadius:24,borderTopRightRadius:24,padding:22,paddingBottom:18}}>
+          <View style={{backgroundColor:isDark?"#071223":"#fff",borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:"82%"}}>
+            <View style={{backgroundColor:"#0c2461",borderTopLeftRadius:24,borderTopRightRadius:24,padding:22,paddingBottom:18}}>
               <TouchableOpacity style={{position:"absolute",top:14,right:16,zIndex:5}} onPress={()=>setBatchModal(null)}>
                 <Text style={{color:"rgba(255,255,255,0.7)",fontSize:20}}>✕</Text>
               </TouchableOpacity>
               {batchModal?.thumbnail
-                ? <Image source={{uri:batchModal.thumbnail}} style={{width:"100%",height:110,borderRadius:12,marginBottom:12}} resizeMode="cover" />
+                ? <Image source={{uri:batchModal.thumbnail}} style={{width:"100%",height:110,borderRadius:12,marginBottom:12}} contentFit="cover" cachePolicy="disk" />
                 : <Image source={CAT_IMG[batchModal?.category||""] || advHypnosisImg}
-                    style={{width:"100%",height:110,borderRadius:12,marginBottom:12}} resizeMode="cover" />}
+                    style={{width:"100%",height:110,borderRadius:12,marginBottom:12}} contentFit="cover" />}
               <View style={{backgroundColor:"rgba(255,255,255,0.2)",alignSelf:"flex-start",borderRadius:8,paddingHorizontal:10,paddingVertical:4,marginBottom:8}}>
                 <Text style={{color:"#fff",fontSize:10,fontWeight:"800"}}>✦ {batchModal?.category || "COURSE"}</Text>
               </View>
@@ -1909,15 +1909,15 @@ export default function HomeScreen() {
               </Text>
             </View>
             <ScrollView style={{padding:20}} showsVerticalScrollIndicator={false}>
-              <View style={{backgroundColor:isDark?"#1e1b4b":"#f0fdf4",borderRadius:16,padding:16,marginBottom:16}}>
+              <View style={{backgroundColor:isDark?"#0f2557":"#f0fdf4",borderRadius:16,padding:16,marginBottom:16}}>
                 <View style={{flexDirection:"row",alignItems:"center",gap:12,marginBottom:14}}>
                   {batchModal && batchModal.discountPrice > 0 && (
                     <Text style={{color:t.textMuted,fontSize:14,textDecorationLine:"line-through"}}>
-                      ₹{Math.round(batchModal.price/100).toLocaleString("en-IN")}
+                      {fmtINR(batchModal.price)}
                     </Text>
                   )}
-                  <Text style={{color:"#0d9488",fontSize:28,fontWeight:"900"}}>
-                    ₹{batchModal ? Math.round((batchModal.discountPrice||batchModal.price)/100).toLocaleString("en-IN") : 0}
+                  <Text style={{color:"#0c2461",fontSize:28,fontWeight:"900"}}>
+                    {batchModal ? fmtINR(batchModal.discountPrice||batchModal.price) : "₹0"}
                   </Text>
                   {batchModal && batchModal.discountPrice > 0 && (
                     <View style={{backgroundColor:"#22c55e22",borderRadius:6,paddingHorizontal:8,paddingVertical:3}}>
@@ -1928,7 +1928,7 @@ export default function HomeScreen() {
                   )}
                 </View>
                 <TouchableOpacity
-                  style={{backgroundColor:"#0d9488",borderRadius:14,paddingVertical:14,alignItems:"center",
+                  style={{backgroundColor:"#0c2461",borderRadius:14,paddingVertical:14,alignItems:"center",
                     opacity:purchaseLoading?0.7:1}}
                   onPress={()=>batchModal && handleBuyCourse(batchModal)}
                   disabled={purchaseLoading}>
@@ -1940,14 +1940,14 @@ export default function HomeScreen() {
               </View>
               <View style={{flexDirection:"row",gap:12,marginBottom:16}}>
                 {[{icon:"📺",label:"Live classes via Agora"},{icon:"🎥",label:"Recordings on Mux"},{icon:"✅",label:"Certificate on completion"}].map(f=>(
-                  <View key={f.label} style={{flex:1,alignItems:"center",backgroundColor:isDark?"#1e1b4b":"#f8fafc",borderRadius:12,padding:10}}>
+                  <View key={f.label} style={{flex:1,alignItems:"center",backgroundColor:isDark?"#0f2557":"#f8fafc",borderRadius:12,padding:10}}>
                     <Text style={{fontSize:22,marginBottom:4}}>{f.icon}</Text>
                     <Text style={{color:t.textMuted,fontSize:10,textAlign:"center"}}>{f.label}</Text>
                   </View>
                 ))}
               </View>
               <TouchableOpacity style={{alignItems:"center",paddingBottom:20}} onPress={()=>{ setBatchModal(null); router.push({ pathname:"/(tabs)/explore", params:{ category:batchModal?.category||"" } }); }}>
-                <Text style={{color:"#0d9488",fontSize:13,fontWeight:"700"}}>View full course details →</Text>
+                <Text style={{color:"#0c2461",fontSize:13,fontWeight:"700"}}>View full course details →</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1957,15 +1957,15 @@ export default function HomeScreen() {
       {/* ── Live Classes Menu Modal ── */}
       <Modal visible={liveMenuOpen} transparent animationType="slide" onRequestClose={()=>setLiveMenuOpen(false)}>
         <TouchableOpacity style={{flex:1,backgroundColor:"rgba(0,0,0,0.6)"}} activeOpacity={1} onPress={()=>setLiveMenuOpen(false)} />
-        <View style={[{backgroundColor: isDark ? "#12103a" : "#fff", borderTopLeftRadius:24, borderTopRightRadius:24, paddingBottom:40, position:"absolute", bottom:0, left:0, right:0}]}>
+        <View style={[{backgroundColor: isDark ? "#071223" : "#fff", borderTopLeftRadius:24, borderTopRightRadius:24, paddingBottom:40, position:"absolute", bottom:0, left:0, right:0}]}>
           {/* Handle bar */}
           <View style={{width:40,height:4,borderRadius:2,backgroundColor:t.border,alignSelf:"center",marginTop:12,marginBottom:16}} />
           <Text style={{color:t.text,fontSize:18,fontWeight:"900",paddingHorizontal:22,marginBottom:4}}>Live Classes</Text>
           <Text style={{color:t.textMuted,fontSize:13,paddingHorizontal:22,marginBottom:20}}>Choose what you want to join</Text>
 
           {[
-            { icon:"people-outline" as IoniconName, label:"1:1 Sessions", desc:"Your booked private sessions with healers", color:"#7c3aed", tab:"oneOnOne" },
-            { icon:"school-outline" as IoniconName, label:"Course Live",  desc:"Live classes for courses you enrolled in",  color:"#0d9488", tab:"courseLive" },
+            { icon:"people-outline" as IoniconName, label:"1:1 Sessions", desc:"Your booked private sessions with healers", color:"#0c2461", tab:"oneOnOne" },
+            { icon:"school-outline" as IoniconName, label:"Course Live",  desc:"Live classes for courses you enrolled in",  color:"#0c2461", tab:"courseLive" },
             { icon:"globe-outline"  as IoniconName, label:"Free for All", desc:"Free live classes open to everyone",          color:"#d97706", tab:"freeAll" },
           ].map(opt=>(
             <TouchableOpacity key={opt.tab}
@@ -1990,8 +1990,8 @@ export default function HomeScreen() {
       {/* ── Booking Modal ── */}
       <Modal visible={bookModal!==null} transparent animationType="slide" onRequestClose={closeSessionModal}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalCard, {backgroundColor: isDark ? "#12103a" : "#fff", maxHeight:"92%",paddingTop:0,paddingHorizontal:0,paddingBottom:0}]}>
-            <View style={[s.psModalHeader, {backgroundColor: isDark ? "#1e1b4b" : "#f5f3ff"}]}>
+          <View style={[s.modalCard, {backgroundColor: isDark ? "#071223" : "#fff", maxHeight:"92%",paddingTop:0,paddingHorizontal:0,paddingBottom:0}]}>
+            <View style={[s.psModalHeader, {backgroundColor: isDark ? "#0f2557" : "#ffffff"}]}>
               <TouchableOpacity style={s.modalClose} onPress={closeSessionModal}>
                 <Text style={{color:"#9ca3af",fontSize:18}}>✕</Text>
               </TouchableOpacity>
@@ -2017,7 +2017,7 @@ export default function HomeScreen() {
                 <View style={{alignItems:"center",paddingVertical:32}}>
                   <View style={s.psSuccessCircle}><Text style={{fontSize:36}}>✓</Text></View>
                   <Text style={[s.psSuccessTitle, {color:t.text}]}>{bookModal==="freeCall" ? "Call Booked! 🎉" : "Request Sent! 🎉"}</Text>
-                  <Text style={[s.psSuccessMsg, {color:t.textSec}]}>{"Thank you, "}<Text style={{color:"#a78bfa",fontWeight:"700"}}>{sName}</Text>{"!\n"}{bookModal==="freeCall" ? "Dr. Pradeep will call you at\n" : "Our healer will reach you at\n"}<Text style={{color:"#a78bfa",fontWeight:"700"}}>{bookModal==="freeCall" ? (sPhone||sEmail) : sEmail}</Text>{"\nwithin 24 hours."}</Text>
+                  <Text style={[s.psSuccessMsg, {color:t.textSec}]}>{"Thank you, "}<Text style={{color:"#60a5fa",fontWeight:"700"}}>{sName}</Text>{"!\n"}{bookModal==="freeCall" ? "Dr. Pradeep will call you at\n" : "Our healer will reach you at\n"}<Text style={{color:"#60a5fa",fontWeight:"700"}}>{bookModal==="freeCall" ? (sPhone||sEmail) : sEmail}</Text>{"\nwithin 24 hours."}</Text>
                   <TouchableOpacity style={s.psSuccessBtn} onPress={closeSessionModal}>
                     <Text style={s.psSuccessBtnTxt}>Done</Text>
                   </TouchableOpacity>
@@ -2046,8 +2046,8 @@ export default function HomeScreen() {
                         const sel = sIssues.includes(tag);
                         return (
                           <TouchableOpacity key={tag} onPress={()=>toggleSIssue(tag)}
-                            style={[s.psTag, sel && s.psTagSel, {borderColor: sel ? "#7c3aed" : t.border}]}>
-                            <Text style={[s.psTagTxt, {color: sel ? "#c4b5fd" : t.textMuted}]}>{tag}</Text>
+                            style={[s.psTag, sel && s.psTagSel, {borderColor: sel ? "#0c2461" : t.border}]}>
+                            <Text style={[s.psTagTxt, {color: sel ? "#93c5fd" : t.textMuted}]}>{tag}</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -2058,8 +2058,8 @@ export default function HomeScreen() {
                     <View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>
                       {PS_TIME_SLOTS.map(slot=>(
                         <TouchableOpacity key={slot} onPress={()=>setSTimeSlot(slot)}
-                          style={[s.psTag, sTimeSlot===slot && s.psTagSel, {borderColor: sTimeSlot===slot ? "#7c3aed" : t.border}]}>
-                          <Text style={[s.psTagTxt, {color: sTimeSlot===slot ? "#c4b5fd" : t.textMuted}]}>{slot}</Text>
+                          style={[s.psTag, sTimeSlot===slot && s.psTagSel, {borderColor: sTimeSlot===slot ? "#0c2461" : t.border}]}>
+                          <Text style={[s.psTagTxt, {color: sTimeSlot===slot ? "#93c5fd" : t.textMuted}]}>{slot}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -2197,7 +2197,7 @@ export default function HomeScreen() {
       {/* ── Breathing Modal ── */}
       <Modal visible={breathModalOpen} transparent animationType="fade" onRequestClose={()=>setBreathModalOpen(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalCard, {backgroundColor: isDark ? "#12103a" : "#fff"}]}>
+          <View style={[s.modalCard, {backgroundColor: isDark ? "#071223" : "#fff"}]}>
             <TouchableOpacity style={s.modalClose} onPress={()=>setBreathModalOpen(false)}>
               <Text style={{color:"#9ca3af",fontSize:18}}>✕</Text>
             </TouchableOpacity>
@@ -2234,7 +2234,7 @@ export default function HomeScreen() {
       {/* ── Pomodoro Modal ── */}
       <Modal visible={pomModalOpen} transparent animationType="fade" onRequestClose={()=>setPomModalOpen(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalCard, {backgroundColor: isDark ? "#12103a" : "#fff"}]}>
+          <View style={[s.modalCard, {backgroundColor: isDark ? "#071223" : "#fff"}]}>
             <TouchableOpacity style={s.modalClose} onPress={()=>{ setPomModalOpen(false); resetPomodoro(); }}>
               <Text style={{color:"#9ca3af",fontSize:18}}>✕</Text>
             </TouchableOpacity>
@@ -2308,26 +2308,22 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
       shadowColor:"#000", shadowOpacity:0.4, shadowRadius:6 },
     avatarDefault: {
       width:34, height:34, borderRadius:17,
-      backgroundColor:"rgba(124,58,237,0.55)", alignItems:"center", justifyContent:"center",
+      backgroundColor:"rgba(30,58,138,0.55)", alignItems:"center", justifyContent:"center",
       borderWidth:2, borderColor:"rgba(255,255,255,0.7)",
       shadowColor:"#000", shadowOpacity:0.5, shadowRadius:6,
     },
     avatarInitial: { color:"#fff", fontWeight:"900", fontSize:14 },
 
-    // Floating search pill — overlaps the hero's bottom edge
-    floatingSearchWrap: { marginTop:-26, marginHorizontal:14, zIndex:50 },
-    floatingSearch: {
-      flexDirection:"row", alignItems:"center", gap:10,
-      borderRadius:50, paddingHorizontal:18, paddingVertical:13,
-      shadowColor:"#000", shadowOpacity:0.28, shadowRadius:20,
-      shadowOffset:{width:0,height:8}, elevation:14,
-    },
-    searchIcon: { fontSize:16 },
-    searchPlaceholder: { fontSize:14, flex:1 },
-
     // ── Hero live-session carousel ──────────────────────────────────────────
-    heroMuteBtn: { position:"absolute", top:14, right:14, width:36, height:36, borderRadius:18, backgroundColor:"rgba(0,0,0,0.38)", alignItems:"center", justifyContent:"center", zIndex:10,
-      borderWidth:1, borderColor:"rgba(255,255,255,0.18)" },
+    heroMuteBtn: {
+      position:"absolute", bottom:52, right:24,
+      width:40, height:40, borderRadius:20,
+      backgroundColor:"rgba(0,0,0,0.52)",
+      alignItems:"center", justifyContent:"center",
+      borderWidth:1.5, borderColor:"rgba(255,255,255,0.32)",
+      shadowColor:"#000", shadowOpacity:0.55, shadowRadius:10, shadowOffset:{width:0,height:3},
+      elevation:10,
+    },
     heroOverlay: { position:"absolute", bottom:0, left:0, right:0, paddingHorizontal:24, paddingBottom:52, alignItems:"center" },
     // Hero text — no background, centred, let image show through
     heroSuperTitle: {
@@ -2371,6 +2367,9 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     startSoonEdu: { color:"rgba(255,255,255,0.75)", fontSize:10, fontWeight:"600" },
     startSoonDate: { color:"rgba(255,255,255,0.6)", fontSize:9, marginTop:2 },
 
+    // ── Spiritual Tools cards ─────────────────────────────────────────────────
+    spiritCard: { width:130, height:175, borderRadius:20, marginRight:12, overflow:"hidden" },
+
     // ── "Get 1:1 Expert Guidance Today" 2×3 icon grid ───────────────────────
     guidance1on1Grid: { flexDirection:"row", flexWrap:"wrap", paddingHorizontal:10, gap:8, marginTop:14 },
     guidanceTile: { width:(SW-36)/3, aspectRatio:1, borderRadius:12, overflow:"hidden", position:"relative", alignItems:"center", justifyContent:"flex-end", paddingBottom:10 },
@@ -2378,7 +2377,7 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
 
     // Banners
     bannerCard: { flex:1, overflow:"hidden" },
-    bannerEducatorImg: { position:"absolute", right:0, bottom:0, width:SW*0.52, height:280, resizeMode:"cover" },
+    bannerEducatorImg: { position:"absolute", right:0, bottom:0, width:SW*0.52, height:280 },
     bannerGradientMask: { position:"absolute", left:0, top:0, bottom:0, width:"65%", backgroundColor:"transparent" },
     bannerBody: { padding:18, paddingTop:22, width:SW*0.62, justifyContent:"center" },
     bannerBadge: { alignSelf:"flex-start", backgroundColor:"rgba(255,255,255,0.18)", borderRadius:20, paddingHorizontal:12, paddingVertical:4, marginBottom:10, borderWidth:1, borderColor:"rgba(255,255,255,0.28)" },
@@ -2386,13 +2385,13 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     bannerTitle: { color:"#fff", fontSize:19, fontWeight:"900", lineHeight:25, marginBottom:6 },
     bannerSub: { color:"rgba(255,255,255,0.75)", fontSize:11, lineHeight:16, marginBottom:12 },
     bannerCta: { backgroundColor:"#fff", paddingHorizontal:16, paddingVertical:8, borderRadius:8, marginBottom:10, alignSelf:"flex-start" },
-    bannerCtaTxt: { color:"#7c3aed", fontSize:12, fontWeight:"800" },
+    bannerCtaTxt: { color:"#0c2461", fontSize:12, fontWeight:"800" },
     bannerDateLabel: { color:"rgba(255,255,255,0.6)", fontSize:10 },
     bannerDate: { color:"#f59e0b", fontSize:12, fontWeight:"700" },
     bannerTnc: { color:"rgba(255,255,255,0.4)", fontSize:9, marginTop:6 },
     dotsRow: { flexDirection:"row", justifyContent:"center", gap:6, paddingVertical:10 },
-    dot: { width:6, height:6, borderRadius:3, backgroundColor:"rgba(124,58,237,0.3)" },
-    dotActive: { backgroundColor:"#7c3aed", width:18 },
+    dot: { width:6, height:6, borderRadius:3, backgroundColor:"rgba(30,58,138,0.3)" },
+    dotActive: { backgroundColor:"#0c2461", width:18 },
 
     // Section commons
     section: { paddingHorizontal:16, paddingTop:20, paddingBottom:8 },
@@ -2403,7 +2402,7 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
 
     // Goal cards (horizontal)
     goalCard: { width:120, height:110, borderRadius:14, overflow:"hidden", marginRight:10, borderWidth:1 },
-    goalImg: { width:"100%", height:"100%", resizeMode:"cover", position:"absolute" },
+    goalImg: { width:"100%", height:"100%", position:"absolute" },
     goalDim: { ...StyleSheet.absoluteFillObject, backgroundColor:"rgba(0,0,0,0.45)" },
     goalInfo: { position:"absolute", bottom:0, left:0, right:0, padding:8 },
     goalName: { color:"#fff", fontSize:11, fontWeight:"700", lineHeight:14 },
@@ -2425,24 +2424,24 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     subjectTabTxt: { fontSize:12, fontWeight:"600" },
 
     // Trainers
-    trainerCard: { width:210, borderRadius:16, marginRight:14, borderWidth:1, overflow:"hidden" },
-    trainerPhotoArea: { height:110, alignItems:"center", justifyContent:"center", position:"relative" },
-    trainerAvatar: { width:72, height:72, borderRadius:36, alignItems:"center", justifyContent:"center", borderWidth:3 },
-    trainerAvatarTxt: { fontSize:22, fontWeight:"900" },
-    trainerBadge: { position:"absolute", top:8, left:8, borderRadius:8, paddingHorizontal:8, paddingVertical:3 },
-    trainerBadgeTxt: { color:"#fff", fontSize:8, fontWeight:"800" },
-    ratingBadge: { position:"absolute", bottom:8, right:8, borderRadius:8, paddingHorizontal:6, paddingVertical:3 },
-    ratingTxt: { color:"#fff", fontSize:10, fontWeight:"700" },
-    trainerInfo: { padding:12 },
-    trainerName: { fontSize:14, fontWeight:"800", marginBottom:2 },
-    trainerRole: { fontSize:11, lineHeight:15, marginBottom:10 },
-    trainerStats: { flexDirection:"row", alignItems:"center", gap:12, marginBottom:10 },
+    trainerCard: { width:152, height:220, borderRadius:20, marginRight:12, overflow:"hidden" },
+    trainerPhotoArea: { height:76, alignItems:"center", justifyContent:"center", position:"relative" },
+    trainerAvatar: { width:52, height:52, borderRadius:26, alignItems:"center", justifyContent:"center", borderWidth:2 },
+    trainerAvatarTxt: { fontSize:16, fontWeight:"900" },
+    trainerBadge: { position:"absolute", top:5, left:5, borderRadius:6, paddingHorizontal:6, paddingVertical:2 },
+    trainerBadgeTxt: { color:"#fff", fontSize:7, fontWeight:"800" },
+    ratingBadge: { position:"absolute", bottom:5, right:5, borderRadius:6, paddingHorizontal:5, paddingVertical:2 },
+    ratingTxt: { color:"#fff", fontSize:8, fontWeight:"700" },
+    trainerInfo: { paddingTop:6, paddingHorizontal:8, paddingBottom:5 },
+    trainerName: { fontSize:12, fontWeight:"800", marginBottom:1 },
+    trainerRole: { fontSize:9, lineHeight:11, marginBottom:3 },
+    trainerStats: { flexDirection:"row", alignItems:"center", gap:4, marginBottom:4 },
     trainerStat: { flex:1, alignItems:"center" },
-    trainerStatVal: { fontSize:13, fontWeight:"800" },
-    trainerStatLabel: { fontSize:9, marginTop:1 },
-    trainerBookBtn: { borderRadius:10, paddingVertical:8, alignItems:"center" },
-    trainerBookBtnTxt: { color:"#fff", fontSize:12, fontWeight:"700" },
-    bigCta: { flexDirection:"row", alignItems:"center", justifyContent:"center", backgroundColor:"#7c3aed", borderRadius:14, paddingVertical:14, paddingHorizontal:20 },
+    trainerStatVal: { fontSize:10, fontWeight:"800" },
+    trainerStatLabel: { fontSize:7, marginTop:1 },
+    trainerBookBtn: { borderRadius:8, paddingVertical:5, alignItems:"center" },
+    trainerBookBtnTxt: { color:"#fff", fontSize:10, fontWeight:"700" },
+    bigCta: { flexDirection:"row", alignItems:"center", justifyContent:"center", backgroundColor:"#0c2461", borderRadius:14, paddingVertical:14, paddingHorizontal:20 },
     bigCtaTxt: { color:"#fff", fontSize:15, fontWeight:"800" },
 
     // Healing Tools
@@ -2469,8 +2468,8 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     healCardFoot: { flexDirection:"row", alignItems:"center", justifyContent:"space-between" },
     healCtaFree: { borderRadius:8, paddingHorizontal:8, paddingVertical:4 },
     healCtaFreeTxt: { fontSize:11, fontWeight:"700" },
-    healCtaLock: { backgroundColor:"rgba(124,58,237,0.2)", borderRadius:8, paddingHorizontal:8, paddingVertical:4 },
-    healCtaLockTxt: { color:"#a78bfa", fontSize:11, fontWeight:"700" },
+    healCtaLock: { backgroundColor:"rgba(30,58,138,0.2)", borderRadius:8, paddingHorizontal:8, paddingVertical:4 },
+    healCtaLockTxt: { color:"#60a5fa", fontSize:11, fontWeight:"700" },
     healUpgradeRow: { flexDirection:"row", alignItems:"center", borderRadius:12, paddingHorizontal:14, paddingVertical:12, borderWidth:1 },
     healUpgradeTxt: { fontSize:12, fontWeight:"600" },
 
@@ -2480,7 +2479,7 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     featureDesc: { fontSize:13, lineHeight:19 },
 
     // Educators
-    eduCard: { flexDirection:"row", borderRadius:16, marginBottom:12, overflow:"hidden", borderWidth:1 },
+    eduCard: { flexDirection:"row", borderRadius:16, overflow:"hidden", borderWidth:1 },
     eduPhotoWrap: { width:120, height:140 },
     eduPhoto: { width:"100%", height:"100%" },
     eduBadgeLabel: { position:"absolute", bottom:6, left:0, right:0, alignItems:"center", paddingVertical:4 },
@@ -2498,9 +2497,9 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     statPillTxt: { fontSize:11, fontWeight:"700" },
 
     // Batches
-    batchCard: { borderRadius:16, marginBottom:16, overflow:"hidden", borderWidth:1 },
+    batchCard: { borderRadius:16, overflow:"hidden", borderWidth:1 },
     batchImgWrapper: { height:140, position:"relative" },
-    batchImg: { width:"100%", height:"100%", resizeMode:"cover" },
+    batchImg: { width:"100%", height:"100%" },
     batchImgDim: { ...StyleSheet.absoluteFillObject, backgroundColor:"rgba(0,0,0,0.3)" },
     batchComingSoonOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor:"rgba(5,4,18,0.55)", alignItems:"center", justifyContent:"center" },
     batchComingSoonPill: { flexDirection:"row", alignItems:"center", gap:5, backgroundColor:"rgba(15,14,38,0.85)", borderRadius:20, paddingHorizontal:14, paddingVertical:6, borderWidth:1, borderColor:"#334155" },
@@ -2525,7 +2524,7 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     detailBtnTxt: { fontSize:13, fontWeight:"600" },
 
     // Testimonials
-    testimonialCard: { borderRadius:16, padding:16, marginBottom:12, borderWidth:1 },
+    testimonialCard: { borderRadius:16, padding:16, borderWidth:1 },
     testimonialText: { fontSize:14, lineHeight:20, fontStyle:"italic" },
     testimonialAvatar: { width:40, height:40, borderRadius:20, alignItems:"center", justifyContent:"center" },
     testimonialName: { fontSize:14, fontWeight:"700" },
@@ -2543,26 +2542,26 @@ function makeStyles(t: ReturnType<typeof import("../../stores/themeStore").useTh
     modalTitle: { fontSize:20, fontWeight:"900", textAlign:"center", marginBottom:4 },
     modalSub: { fontSize:13, textAlign:"center", marginBottom:20 },
     psModalHeader: { paddingTop:20, paddingHorizontal:22, paddingBottom:16 },
-    psModalBadge: { backgroundColor:"rgba(124,58,237,0.2)", alignSelf:"flex-start", borderRadius:10, paddingHorizontal:10, paddingVertical:4, marginBottom:8 },
-    psModalBadgeTxt: { color:"#a78bfa", fontSize:10, fontWeight:"800" },
+    psModalBadge: { backgroundColor:"rgba(30,58,138,0.2)", alignSelf:"flex-start", borderRadius:10, paddingHorizontal:10, paddingVertical:4, marginBottom:8 },
+    psModalBadgeTxt: { color:"#60a5fa", fontSize:10, fontWeight:"800" },
     psModalTitle: { fontSize:20, fontWeight:"900", marginBottom:4 },
     psModalSub: { fontSize:13 },
     psLoadingWrap: { alignItems:"center", paddingVertical:40 },
-    psSpinner: { width:40, height:40, borderRadius:20, borderWidth:3, borderColor:"#7c3aed", borderTopColor:"transparent" },
+    psSpinner: { width:40, height:40, borderRadius:20, borderWidth:3, borderColor:"#0c2461", borderTopColor:"transparent" },
     psLoadingTxt: { marginTop:12, fontSize:14 },
     psSuccessCircle: { width:72, height:72, borderRadius:36, backgroundColor:"rgba(34,197,94,0.2)", alignItems:"center", justifyContent:"center", marginBottom:16 },
     psSuccessTitle: { fontSize:22, fontWeight:"900", marginBottom:8 },
     psSuccessMsg: { fontSize:14, textAlign:"center", lineHeight:22, marginBottom:16 },
-    psSuccessBtn: { backgroundColor:"#7c3aed", borderRadius:12, paddingHorizontal:32, paddingVertical:12 },
+    psSuccessBtn: { backgroundColor:"#0c2461", borderRadius:12, paddingHorizontal:32, paddingVertical:12 },
     psSuccessBtnTxt: { color:"#fff", fontWeight:"800", fontSize:15 },
     psFieldLabel: { fontSize:12, fontWeight:"600", marginBottom:5 },
     psInput: { borderRadius:10, paddingHorizontal:14, paddingVertical:11, fontSize:14, marginBottom:4, borderWidth:1 },
     psTag: { paddingHorizontal:12, paddingVertical:7, borderRadius:20, borderWidth:1.5 },
-    psTagSel: { backgroundColor:"rgba(124,58,237,0.2)" },
+    psTagSel: { backgroundColor:"rgba(30,58,138,0.2)" },
     psTagTxt: { fontSize:12, fontWeight:"600" },
     psPrivacyRow: { flexDirection:"row", alignItems:"flex-start", gap:10, borderRadius:10, padding:12, borderWidth:1 },
     psPrivacyTxt: { fontSize:12, flex:1, lineHeight:17 },
-    psSubmitBtn: { backgroundColor:"#7c3aed", borderRadius:14, paddingVertical:15, alignItems:"center", shadowColor:"#7c3aed", shadowOpacity:0.4, shadowRadius:12, elevation:6, marginTop:4 },
+    psSubmitBtn: { backgroundColor:"#0c2461", borderRadius:14, paddingVertical:15, alignItems:"center", shadowColor:"#0c2461", shadowOpacity:0.4, shadowRadius:12, elevation:6, marginTop:4 },
     psSubmitTxt: { color:"#fff", fontSize:15, fontWeight:"900" },
 
     // Breathing modal
