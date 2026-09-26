@@ -433,7 +433,7 @@ const HeroCarousel = React.memo(({ heroSlides, isTabFocused, isHeroVisible, data
                   )}
                   {b.videoUrl && isActiveSlide && !failedVideoIds.current.has(b._id) && (
                     <Video
-                      source={{ uri: `${API_URL}/hero-banners/${b._id}/video-stream`, overrideFileExtensionAndroid: "mp4" }}
+                      source={{ uri: b.videoUrl, overrideFileExtensionAndroid: "mp4" }}
                       style={{ position:"absolute", width:"100%", height:"100%" }}
                       resizeMode={ResizeMode.COVER}
                       shouldPlay={isTabFocused && isHeroVisible && dataReady} isLooping isMuted={heroMuted} useNativeControls={false}
