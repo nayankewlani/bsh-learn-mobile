@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Image } from "react-native";
-import { router } from "expo-router";
+﻿import React, { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { Image } from "expo-image";
+import { router, useLocalSearchParams } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { COLORS } from "../../constants";
 
@@ -9,12 +10,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const { login, isLoading, error, clearError } = useAuthStore();
+  const { redirectTo, redirectParams } = useLocalSearchParams<{ redirectTo?: string; redirectParams?: string }>();
 
   const handleLogin = async () => {
     clearError();
     try {
       await login(email, password);
-      router.replace("/(tabs)");
+      if (redirectTo) {
+        try {
+          const params = redirectParams ? JSON.parse(redirectParams) : {};
+          router.replace({ pathname: redirectTo as any, params });
+        } catch {
+          router.replace(redirectTo as any);
+        }
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (err: unknown) {
       Alert.alert("Login Failed", (err as Error).message);
     }
@@ -26,7 +37,7 @@ export default function LoginScreen() {
       <Image
         source={require("../../assets/logo-1.png")}
         style={styles.logo}
-        resizeMode="contain"
+        contentFit="contain"
       />
 
       <Text style={styles.title}>Welcome Back</Text>
@@ -94,7 +105,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "900", color: COLORS.text, marginBottom: 4 },
   subtitle: { fontSize: 14, color: COLORS.textMuted, marginBottom: 36 },
   form: { width: "100%", maxWidth: 380 },
-  label: { color: "#c4b5fd", fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  label: { color: "#93c5fd", fontSize: 13, fontWeight: "600", marginBottom: 6 },
   input: { backgroundColor: COLORS.surface2, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12, color: COLORS.text, padding: 13, fontSize: 15, marginBottom: 16 },
   passRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },
   eyeBtn: { paddingHorizontal: 12, paddingVertical: 13 },
