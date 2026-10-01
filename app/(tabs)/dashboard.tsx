@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -26,13 +26,13 @@ const ACHIEVEMENTS: { id: string; icon: IoniconName; label: string; color: strin
   { id: "1", icon: "star",              label: "First Course",   color: "#f59e0b", earned: true  },
   { id: "2", icon: "flame",             label: "7-Day Streak",   color: "#ef4444", earned: true  },
   { id: "3", icon: "trophy-outline",    label: "Completed",      color: "#4ade80", earned: false },
-  { id: "4", icon: "diamond-outline",   label: "BSH Elite",      color: "#a78bfa", earned: false },
+  { id: "4", icon: "diamond-outline",   label: "BSH Elite",      color: "#FF6B8A", earned: false },
   { id: "5", icon: "heart-outline",     label: "Healer",         color: "#ec4899", earned: false },
   { id: "6", icon: "shield-checkmark-outline", label: "Certified", color: "#06b6d4", earned: false },
 ];
 
 const QUICK_ACTIONS: { icon: IoniconName; label: string; color: string; route: string | null }[] = [
-  { icon: "book-outline",   label: "Courses",   color: "#7c3aed", route: "/(tabs)/explore" },
+  { icon: "book-outline",   label: "Courses",   color: "#FF1E56", route: "/(tabs)/explore" },
   { icon: "radio-outline",  label: "Live",      color: "#ef4444", route: "/(tabs)/live"    },
   { icon: "bag-outline",    label: "Store",     color: "#f59e0b", route: "/(tabs)/store"   },
   { icon: "person-outline", label: "Profile",   color: "#4ade80", route: null              },
@@ -60,7 +60,7 @@ export default function DashboardScreen() {
     if (user) fetchMyCourses();
   }, [user]);
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const delta = y - lastScrollYRef.current;
     lastScrollYRef.current = y;
@@ -78,7 +78,7 @@ export default function DashboardScreen() {
       headerHiddenRef.current = false;
       Animated.timing(headerTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     }
-  };
+  }, []);
 
   /* ─── Guest View ─── */
   if (!user) {
@@ -92,7 +92,7 @@ export default function DashboardScreen() {
         <ScrollView contentContainerStyle={styles.guestContent} showsVerticalScrollIndicator={false}>
           <View style={styles.guestHero}>
             <View style={styles.guestIconRing}>
-              <Ionicons name="school-outline" size={52} color="#a78bfa" />
+              <Ionicons name="school-outline" size={52} color="#FF6B8A" />
             </View>
             <Text style={styles.guestTitle}>Start Your Healing Journey</Text>
             <Text style={styles.guestDesc}>
@@ -104,7 +104,7 @@ export default function DashboardScreen() {
             {BENEFITS.map((b, i) => (
               <View key={i} style={styles.benefitRow}>
                 <View style={styles.benefitIconBox}>
-                  <Ionicons name={b.icon} size={20} color="#a78bfa" />
+                  <Ionicons name={b.icon} size={20} color="#FF6B8A" />
                 </View>
                 <Text style={styles.benefitText}>{b.text}</Text>
               </View>
@@ -130,15 +130,15 @@ export default function DashboardScreen() {
   }
 
   /* ─── Authenticated View ─── */
-  const inProgress = enrolledCourses.filter((e) => e.progress < 100);
-  const completed  = enrolledCourses.filter((e) => e.progress === 100);
+  const inProgress = useMemo(() => enrolledCourses.filter((e) => e.progress < 100), [enrolledCourses]);
+  const completed  = useMemo(() => enrolledCourses.filter((e) => e.progress === 100), [enrolledCourses]);
   const streak     = 7;
-  const initials   = user.name
+  const initials   = useMemo(() => user.name
     .split(" ")
     .map((n: string) => n[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2), [user.name]);
 
   const CARD_W = (SW - 32 - 20) / 3;
 
@@ -191,13 +191,13 @@ export default function DashboardScreen() {
                   activeOpacity={0.6}
                   onPress={() => router.push("/educator-dashboard" as any)}
                 >
-                  <Ionicons name="mic-outline" size={12} color="#a78bfa" />
+                  <Ionicons name="mic-outline" size={12} color="#FF6B8A" />
                   <Text style={styles.roleLabel}>Educator</Text>
-                  <Ionicons name="chevron-forward" size={11} color="#a78bfa" />
+                  <Ionicons name="chevron-forward" size={11} color="#FF6B8A" />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.rolePill}>
-                  <Ionicons name="school-outline" size={12} color="#a78bfa" />
+                  <Ionicons name="school-outline" size={12} color="#FF6B8A" />
                   <Text style={styles.roleLabel}>Learner</Text>
                 </View>
               )}
@@ -211,7 +211,7 @@ export default function DashboardScreen() {
         {/* Stats strip */}
         <View style={styles.statsStrip}>
           {[
-            { icon: "library-outline"         as IoniconName, val: enrolledCourses.length, label: "Enrolled",    color: "#a78bfa" },
+            { icon: "library-outline"         as IoniconName, val: enrolledCourses.length, label: "Enrolled",    color: "#FF6B8A" },
             { icon: "hourglass-outline"        as IoniconName, val: inProgress.length,      label: "In Progress", color: "#f59e0b" },
             { icon: "checkmark-circle-outline" as IoniconName, val: completed.length,        label: "Completed",   color: "#4ade80" },
             { icon: "flame"                    as IoniconName, val: streak,                  label: "Day Streak",  color: "#ef4444" },
@@ -278,7 +278,7 @@ export default function DashboardScreen() {
                   !a.earned && styles.achieveLocked,
                 ]}
               >
-                <View style={[styles.achieveRing, { backgroundColor: a.earned ? a.color + "25" : "#1e1b4b" }]}>
+                <View style={[styles.achieveRing, { backgroundColor: a.earned ? a.color + "25" : "#F5F7FA" }]}>
                   <Ionicons name={a.icon} size={26} color={a.earned ? a.color : "#374151"} />
                 </View>
                 <Text style={[styles.achieveName, !a.earned && { color: "#4b5563" }]}>{a.label}</Text>
@@ -333,8 +333,8 @@ const styles = StyleSheet.create({
   /* ── Floating header ── */
   floatHeader: {
     position: "absolute", top: 0, left: 0, right: 0, zIndex: 100, elevation: 10,
-    backgroundColor: "#13122a",
-    borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
     justifyContent: "flex-end", paddingBottom: 12,
   },
   floatHeaderInner: {
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between", paddingHorizontal: 18,
   },
   floatBSH:   { color: "#fff", fontWeight: "900", fontSize: 20, letterSpacing: 1 },
-  floatSub:   { color: "#a78bfa", fontSize: 11, fontWeight: "600", marginTop: -2 },
+  floatSub:   { color: "#FF6B8A", fontSize: 11, fontWeight: "600", marginTop: -2 },
   floatRight: { flexDirection: "row", alignItems: "center", gap: 10 },
   streakPill: {
     flexDirection: "row", alignItems: "center", gap: 4,
@@ -354,31 +354,31 @@ const styles = StyleSheet.create({
   avatarChip:    {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: "#a78bfa44",
+    borderWidth: 2, borderColor: "#FF6B8A44",
   },
   avatarChipText: { color: "#fff", fontWeight: "800", fontSize: 13 },
 
   /* ── Guest ── */
   guestRoot:    { flex: 1, backgroundColor: COLORS.bg },
   guestTopBar:  {
-    backgroundColor: "#13122a", paddingHorizontal: 18, paddingBottom: 14,
-    borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", paddingHorizontal: 18, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   topBarBSH:    { color: "#fff", fontWeight: "900", fontSize: 20, letterSpacing: 1 },
-  topBarSub:    { color: "#a78bfa", fontSize: 11, fontWeight: "600", marginTop: -1 },
+  topBarSub:    { color: "#FF6B8A", fontSize: 11, fontWeight: "600", marginTop: -1 },
   guestContent: { paddingHorizontal: 24, paddingTop: 32 },
   guestHero:    { alignItems: "center", marginBottom: 30 },
   guestIconRing:{
-    width: 100, height: 100, borderRadius: 50, backgroundColor: "#a78bfa22",
+    width: 100, height: 100, borderRadius: 50, backgroundColor: "#FF6B8A22",
     alignItems: "center", justifyContent: "center", marginBottom: 20,
-    borderWidth: 2, borderColor: "#a78bfa44",
+    borderWidth: 2, borderColor: "#FF6B8A44",
   },
   guestTitle:   { color: COLORS.text, fontWeight: "800", fontSize: 22, textAlign: "center", marginBottom: 10 },
   guestDesc:    { color: COLORS.textMuted, fontSize: 14, textAlign: "center", lineHeight: 22 },
   benefitsList: { marginBottom: 28 },
   benefitRow:   { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
   benefitIconBox:{
-    width: 42, height: 42, borderRadius: 12, backgroundColor: "#a78bfa22",
+    width: 42, height: 42, borderRadius: 12, backgroundColor: "#FF6B8A22",
     alignItems: "center", justifyContent: "center",
   },
   benefitText:  { color: COLORS.text, fontSize: 14, flex: 1 },
@@ -393,12 +393,12 @@ const styles = StyleSheet.create({
   /* ── Profile card ── */
   profileCard: {
     marginHorizontal: 16, marginBottom: 14, borderRadius: 18,
-    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: "#3730a3",
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: "#FF1E56",
     overflow: "hidden",
   },
   profileStripe: {
     position: "absolute", top: 0, left: 0, right: 0, height: 50,
-    backgroundColor: "#3730a3",
+    backgroundColor: "#FF1E56",
   },
   profileBody: {
     flexDirection: "row", alignItems: "center", gap: 14,
@@ -407,16 +407,16 @@ const styles = StyleSheet.create({
   avatarBig:     {
     width: 58, height: 58, borderRadius: 29,
     backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center",
-    borderWidth: 3, borderColor: "#1e1b4b", marginTop: -14,
+    borderWidth: 3, borderColor: "#F5F7FA", marginTop: -14,
   },
   avatarBigText: { color: "#fff", fontWeight: "900", fontSize: 21 },
   profileName:   { color: COLORS.text, fontWeight: "800", fontSize: 16, marginBottom: 5 },
   rolePill:      {
     flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: "#a78bfa22", borderRadius: 20,
+    backgroundColor: "#FF6B8A22", borderRadius: 20,
     paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start",
   },
-  roleLabel:  { color: "#a78bfa", fontSize: 11, fontWeight: "600" },
+  roleLabel:  { color: "#FF6B8A", fontSize: 11, fontWeight: "600" },
   logoutTap:  { padding: 6 },
 
   /* ── Stats strip ── */

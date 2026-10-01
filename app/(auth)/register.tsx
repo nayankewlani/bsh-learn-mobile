@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, ScrollView, Image,
+  ActivityIndicator, ScrollView,
 } from "react-native";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { COLORS } from "../../constants";
@@ -14,7 +15,6 @@ export default function RegisterScreen() {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [role, setRole]         = useState<"student" | "educator">("student");
 
   // ── Step management ────────────────────────────────────────────────────────
   const [step, setStep]         = useState<"form" | "otp">("form");
@@ -64,7 +64,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const { data: v } = await client.post("/auth/verify-otp", { email: email.trim(), code: otpCode });
-      await register(name.trim(), email.trim(), password, role, v.verificationId);
+      await register(name.trim(), email.trim(), password, "student", v.verificationId);
       router.replace("/(tabs)");
     } catch (e: any) {
       setErr(e?.response?.data?.message || e?.message || "Verification failed. Check your code and try again.");
@@ -89,23 +89,12 @@ export default function RegisterScreen() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
-      <Image source={require("../../assets/logo-1.png")} style={s.logo} resizeMode="contain" />
+      <Image source={require("../../assets/logo-1.png")} style={s.logo} contentFit="contain" />
 
       {step === "form" ? (
         <>
           <Text style={s.title}>Create account</Text>
           <Text style={s.subtitle}>Join BSH Healers community</Text>
-
-          <View style={s.roleRow}>
-            {(["student", "educator"] as const).map(r => (
-              <TouchableOpacity key={r} onPress={() => setRole(r)}
-                style={[s.roleBtn, role === r && s.roleBtnActive]}>
-                <Text style={[s.roleBtnText, role === r && { color: "#fff" }]}>
-                  {r === "student" ? "🎓 Student" : "👨‍🏫 Educator"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
 
           <View style={s.form}>
             <Text style={s.label}>Full Name</Text>
@@ -196,12 +185,8 @@ const s = StyleSheet.create({
   logo:          { width: 160, height: 70, marginBottom: 16 },
   title:         { fontSize: 22, fontWeight: "800", color: COLORS.text, marginBottom: 4 },
   subtitle:      { fontSize: 14, color: COLORS.textMuted, marginBottom: 8, textAlign: "center" },
-  roleRow:       { flexDirection: "row", gap: 8, marginBottom: 24, backgroundColor: "#0f0e1a", borderRadius: 12, padding: 4 },
-  roleBtn:       { flex: 1, padding: 10, borderRadius: 10, alignItems: "center" },
-  roleBtnActive: { backgroundColor: COLORS.primary },
-  roleBtnText:   { color: COLORS.textMuted, fontWeight: "600", fontSize: 14 },
   form:          { width: "100%", maxWidth: 380 },
-  label:         { color: "#c4b5fd", fontSize: 14, fontWeight: "600", marginBottom: 6 },
+  label:         { color: "#93c5fd", fontSize: 14, fontWeight: "600", marginBottom: 6 },
   input:         { backgroundColor: COLORS.surface2, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 10, color: COLORS.text, padding: 12, fontSize: 15, marginBottom: 16 },
   otpInput:      { textAlign: "center", fontSize: 30, letterSpacing: 14, fontWeight: "800", paddingVertical: 18 },
   passRow:       { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },

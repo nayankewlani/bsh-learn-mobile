@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Video, ResizeMode } from "expo-av";
@@ -23,13 +23,18 @@ export default function WatchScreen() {
 
   useEffect(() => {
     if (!lessonId) return;
+    let cancelled = false;
     client.get(`/lessons/${lessonId}/watch`)
       .then(({ data }) => {
+        if (cancelled) return;
         setLesson(data.lesson);
-        setStreamUrl(data.streamUrl || `https://stream.mux.com/${data.lesson.muxPlaybackId}.m3u8`);
+        // Cap at 720p on mobile to reduce buffering on slower connections
+        const base = data.streamUrl || `https://stream.mux.com/${data.lesson.muxPlaybackId}.m3u8`;
+        setStreamUrl(base.includes("stream.mux.com") ? `${base}?maxResolution=720p` : base);
       })
-      .catch(() => Alert.alert("Error", "Could not load video"))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!cancelled) Alert.alert("Error", "Could not load video"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [lessonId]);
 
   const markComplete = async () => {

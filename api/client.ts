@@ -2,11 +2,28 @@ import axios from "axios";
 import { API_URL } from "../constants";
 import * as SecureStore from "expo-secure-store";
 
-const client = axios.create({ baseURL: API_URL, timeout: 30000 });
+const client = axios.create({
+  baseURL: API_URL,
+  timeout: 10000,
+  headers: { "Accept-Encoding": "gzip, deflate" },
+});
 
-client.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync("accessToken");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+// In-memory token cache — eliminates SecureStore (Android Keystore) read on every request.
+// SecureStore is a cryptographic operation that adds 20-50ms per call.
+// We read once from disk; after that every request uses the in-memory copy instantly.
+let _cachedToken: string | null = null;
+
+export async function loadTokenFromStore(): Promise<string | null> {
+  _cachedToken = await SecureStore.getItemAsync("accessToken");
+  return _cachedToken;
+}
+
+export function setMemoryToken(token: string | null): void {
+  _cachedToken = token;
+}
+
+client.interceptors.request.use((config) => {
+  if (_cachedToken) config.headers.Authorization = `Bearer ${_cachedToken}`;
   return config;
 });
 
@@ -25,6 +42,7 @@ async function refreshAccessToken(): Promise<string> {
       const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
       await SecureStore.setItemAsync("accessToken", data.accessToken);
       await SecureStore.setItemAsync("refreshToken", data.refreshToken);
+      _cachedToken = data.accessToken;
       return data.accessToken as string;
     })().finally(() => { refreshPromise = null; });
   }
@@ -43,6 +61,7 @@ client.interceptors.response.use(
         original.headers.Authorization = `Bearer ${accessToken}`;
         return client(original);
       } catch {
+        _cachedToken = null;
         await SecureStore.deleteItemAsync("accessToken");
         await SecureStore.deleteItemAsync("refreshToken");
       }

@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Image } from "react-native";
+﻿import React, { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { COLORS } from "../../constants";
 import client from "../../api/client";
@@ -35,7 +36,7 @@ export default function ForgotPasswordScreen() {
       <Image
         source={require("../../assets/logo-1.png")}
         style={styles.logo}
-        resizeMode="contain"
+        contentFit="contain"
       />
 
       {!success ? (
@@ -111,14 +112,14 @@ const styles = StyleSheet.create({
   inputIcon: { fontSize: 16, color: "#9ca3af", marginRight: 10 },
   input: { flex: 1, fontSize: 15, color: "#111", paddingVertical: 12 },
   errorText: { color: "#ef4444", fontSize: 12, marginBottom: 12, marginLeft: 4 },
-  btn: { backgroundColor: "#7c3aed", borderRadius: 12, padding: 15, alignItems: "center", marginTop: 16 },
+  btn: { backgroundColor: "#FF1E56", borderRadius: 12, padding: 15, alignItems: "center", marginTop: 16 },
   btnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   successIconBox: { width: 72, height: 72, borderRadius: 36, backgroundColor: "#dcfce7", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 16 },
   successIcon: { fontSize: 32, color: "#22c55e" },
   successTitle: { fontSize: 22, fontWeight: "800", color: "#111", textAlign: "center", marginBottom: 10 },
   successSub: { fontSize: 14, color: "#666", textAlign: "center", lineHeight: 22, marginBottom: 20 },
-  outlineBtn: { borderWidth: 1.5, borderColor: "#7c3aed", borderRadius: 10, padding: 11, alignItems: "center" },
-  outlineBtnText: { color: "#7c3aed", fontWeight: "600", fontSize: 14 },
+  outlineBtn: { borderWidth: 1.5, borderColor: "#FF1E56", borderRadius: 10, padding: 11, alignItems: "center" },
+  outlineBtnText: { color: "#FF1E56", fontWeight: "600", fontSize: 14 },
   footer: { flexDirection: "row", marginTop: 24 },
   footerText: { color: COLORS.textMuted, fontSize: 14 },
   footerLink: { color: COLORS.primaryLight, fontWeight: "700", fontSize: 14 },

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Alert,
@@ -70,7 +70,7 @@ export default function AdminTrainersScreen() {
   const renderItem = ({ item }: { item: Trainer }) => (
     <View style={styles.card}>
       <View style={styles.row}>
-        <View style={[styles.avatar, { backgroundColor: item.isActive ? "#7c3aed" : "#374151" }]}>
+        <View style={[styles.avatar, { backgroundColor: item.isActive ? "#FF1E56" : "#374151" }]}>
           <Text style={styles.avatarText}>
             {item.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
           </Text>
@@ -85,11 +85,11 @@ export default function AdminTrainersScreen() {
           <Text style={styles.email}>{item.email}</Text>
           <View style={styles.statsRow}>
             <View style={styles.statBadge}>
-              <Ionicons name="book-outline" size={11} color="#a78bfa" />
+              <Ionicons name="book-outline" size={11} color="#FF6B8A" />
               <Text style={styles.statText}>{item.courseCount} courses</Text>
             </View>
             <View style={styles.statBadge}>
-              <Ionicons name="people-outline" size={11} color="#60a5fa" />
+              <Ionicons name="people-outline" size={11} color="#FF6B8A" />
               <Text style={styles.statText}>{item.studentCount} students</Text>
             </View>
             <View style={styles.statBadge}>
@@ -156,8 +156,8 @@ const styles = StyleSheet.create({
   list:   { padding: 16, paddingBottom: 56 },
 
   card: {
-    backgroundColor: "#13122a", borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: "#1e1b4b", marginBottom: 8,
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: "#F5F7FA", marginBottom: 8,
   },
   row:      { flexDirection: "row", alignItems: "center" },
   avatar:   { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   activeTag:{ fontSize: 11, fontWeight: "600" },
   email:    { color: COLORS.textMuted, fontSize: 12, marginBottom: 6 },
   statsRow: { flexDirection: "row", gap: 8 },
-  statBadge:{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#1e1b4b", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  statBadge:{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F5F7FA", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   statText: { color: COLORS.textMuted, fontSize: 10 },
   actionBtn:{ padding: 8, borderRadius: 10 },
   emptyText:{ color: COLORS.textMuted, marginTop: 12, fontSize: 14 },

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, TextInput, Alert,
@@ -172,14 +172,14 @@ const styles = StyleSheet.create({
 
   searchBox: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: "#13122a", paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   searchInput: { flex: 1, color: COLORS.text, fontSize: 14 },
 
   card: {
-    backgroundColor: "#13122a", borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: "#1e1b4b", marginBottom: 8,
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: "#F5F7FA", marginBottom: 8,
   },
   row:    { flexDirection: "row", alignItems: "center" },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },

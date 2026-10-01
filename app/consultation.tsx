@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+﻿import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, TextInput, Modal, Animated, Alert, ActivityIndicator,
+  View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet,
+  TextInput, Modal, Animated, Alert, ActivityIndicator,
   NativeSyntheticEvent, NativeScrollEvent,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -98,7 +99,7 @@ const ApplyModal: React.FC<{
           {/* Header */}
           <View style={[am.header, { backgroundColor: expert.color + "cc" }]}>
             {expert.localImg
-              ? <Image source={expert.localImg} style={am.headerImg} />
+              ? <Image source={expert.localImg} style={am.headerImg} contentFit="cover" />
               : <View style={[am.headerImgFallback, { backgroundColor: expert.color }]}>
                   <Text style={am.headerInitial}>{expert.name[0]}</Text>
                 </View>
@@ -258,8 +259,8 @@ const ChatModal: React.FC<{
                   const sel = issues.includes(tag);
                   return (
                     <TouchableOpacity key={tag} onPress={() => toggle(tag)}
-                      style={[cm.tag, { borderColor:sel?"#7c3aed":t.border, backgroundColor:sel?"rgba(124,58,237,0.12)":"transparent" }]}>
-                      <Text style={[cm.tagTxt, { color:sel?"#a78bfa":t.textMuted }]}>{tag}</Text>
+                      style={[cm.tag, { borderColor:sel?"#0c2461":t.border, backgroundColor:sel?"rgba(30,58,138,0.12)":"transparent" }]}>
+                      <Text style={[cm.tagTxt, { color:sel?"#60a5fa":t.textMuted }]}>{tag}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -301,7 +302,7 @@ const ChatModal: React.FC<{
 const ExpertCard: React.FC<{
   expert: Expert; t: ThemeColors; isDark: boolean;
   onApply: ()=>void; onChat: ()=>void; onBook: ()=>void;
-}> = ({ expert, t, isDark, onApply, onChat, onBook }) => {
+}> = React.memo(({ expert, t, isDark, onApply, onChat, onBook }) => {
   const stars = Math.round(expert.rating);
   const priceRs = expert.sessionPricePaise > 0 ? Math.round(expert.sessionPricePaise / 100) : 0;
 
@@ -311,9 +312,9 @@ const ExpertCard: React.FC<{
       <View style={ec.topRow}>
         <View style={ec.avatarWrap}>
           {expert.localImg
-            ? <Image source={expert.localImg} style={[ec.avatar, { borderColor:expert.color }]} />
+            ? <Image source={expert.localImg} style={[ec.avatar, { borderColor:expert.color }]} contentFit="cover" />
             : expert.avatarUrl
-              ? <Image source={{ uri:expert.avatarUrl }} style={[ec.avatar, { borderColor:expert.color }]} />
+              ? <Image source={{ uri:expert.avatarUrl }} style={[ec.avatar, { borderColor:expert.color }]} contentFit="cover" cachePolicy="disk" />
               : <View style={[ec.avatarFallback, { backgroundColor:expert.color, borderColor:expert.color }]}>
                   <Text style={ec.avatarInitial}>{expert.name[0]}</Text>
                 </View>
@@ -395,7 +396,7 @@ const ExpertCard: React.FC<{
       </View>
     </View>
   );
-};
+});
 
 const ec = StyleSheet.create({
   card:        { borderRadius:16, padding:16, marginBottom:14, borderWidth:1 },
@@ -409,7 +410,7 @@ const ec = StyleSheet.create({
   role:        { fontSize:11, marginBottom:4 },
   subjectChip: { alignSelf:"flex-start", borderRadius:20, paddingHorizontal:8, paddingVertical:2, borderWidth:1 },
   subjectTxt:  { fontSize:10, fontWeight:"700" },
-  statsRow:    { flexDirection:"row", borderRadius:10, padding:"8px 10px" as any, marginBottom:10, paddingVertical:8, paddingHorizontal:10 },
+  statsRow:    { flexDirection:"row", borderRadius:10, paddingVertical:8, paddingHorizontal:10, marginBottom:10 },
   statCell:    { flex:1, alignItems:"center" },
   statVal:     { fontSize:10, fontWeight:"600", textAlign:"center" },
   ratingRow:   { flexDirection:"row", justifyContent:"space-between", alignItems:"center", marginBottom:12 },
@@ -419,9 +420,11 @@ const ec = StyleSheet.create({
   btnRow:      { flexDirection:"row", gap:8 },
   chatBtn:     { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center", gap:5, borderWidth:1.5, borderRadius:50, paddingVertical:9 },
   chatBtnTxt:  { fontWeight:"700", fontSize:12 },
-  bookBtn:     { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center", gap:5, backgroundColor:"#7c3aed", borderRadius:50, paddingVertical:9 },
+  bookBtn:     { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center", gap:5, backgroundColor:"#0c2461", borderRadius:50, paddingVertical:9 },
   bookBtnTxt:  { color:"#fff", fontWeight:"700", fontSize:12 },
 });
+
+ExpertCard.displayName = "ExpertCard";
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ConsultationScreen() {
@@ -461,7 +464,7 @@ export default function ConsultationScreen() {
           name:              e.name,
           role:              e.trainerRole || "",
           subject:           e.specialties?.[0] || "",
-          color:             e.trainerColor || "#7c3aed",
+          color:             e.trainerColor || "#0c2461",
           localImg:          LOCAL_IMGS[e.name.toLowerCase()] ?? null,
           avatarUrl:         e.avatar || "",
           exp:               e.experience || "",
@@ -517,16 +520,22 @@ export default function ConsultationScreen() {
 
   const onlineCount = experts.filter(e => e.isOnline).length;
 
-  const handleApply = (expert: Expert) => {
+  const specCountMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    experts.forEach(e => { if (e.subject) m[e.subject] = (m[e.subject] ?? 0) + 1; });
+    return m;
+  }, [experts]);
+
+  const handleApply = useCallback((expert: Expert) => {
     if (!user) {
       Alert.alert("Login Required","Please log in to apply for a session.",
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
     setApplying(expert);
-  };
+  }, [user]);
 
-  const handleBook = async (expert: Expert) => {
+  const handleBook = useCallback(async (expert: Expert) => {
     if (!user) {
       Alert.alert("Login Required","Please log in to book a session.",
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
@@ -550,7 +559,7 @@ export default function ConsultationScreen() {
       const paymentData = await RazorpayCheckout.open({
         key: RAZORPAY_KEY_ID, amount: String(order.amount), currency: "INR",
         name: "BSH Healers", description: `Session with ${expert.name} — ₹${Math.round(expert.sessionPricePaise/100)}/min`,
-        order_id: order.id, prefill: { name:user.name, email:user.email }, theme: { color:expert.color || "#7c3aed" },
+        order_id: order.id, prefill: { name:user.name, email:user.email }, theme: { color:expert.color || "#0c2461" },
       });
       await client.post("/payments/verify", {
         razorpayOrderId: paymentData.razorpay_order_id,
@@ -563,7 +572,7 @@ export default function ConsultationScreen() {
       if (e?.code === 0) return;
       Alert.alert("Payment Failed", e.response?.data?.message ?? e.description ?? e.message ?? "Payment failed. Please try again.");
     } finally { setBookLoading(false); }
-  };
+  }, [user, bookLoading]);
 
   return (
     <View style={[s.root, { backgroundColor:t.bg }]}>
@@ -573,7 +582,7 @@ export default function ConsultationScreen() {
           <TouchableOpacity onPress={()=>router.back()} style={s.backBtn}>
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
-          <Image source={bshLogoImg} style={s.logo} resizeMode="contain" />
+          <Image source={bshLogoImg} style={s.logo} contentFit="contain" />
           <View style={{ flex:1 }}>
             <Text style={s.headerTitle}>Consultation</Text>
             <Text style={s.headerSub}>Talk to Expert Healers</Text>
@@ -586,7 +595,7 @@ export default function ConsultationScreen() {
           )}
           <TouchableOpacity onPress={() => router.push(user ? "/(tabs)/dashboard" : "/(auth)/login")}>
             {user?.avatar
-              ? <Image source={{ uri:user.avatar }} style={s.avatar} />
+              ? <Image source={{ uri:user.avatar }} style={s.avatar} contentFit="cover" cachePolicy="memory-disk" />
               : <View style={s.avatarDefault}><Text style={s.avatarInitial}>{user?.name?.[0]?.toUpperCase() ?? "B"}</Text></View>
             }
           </TouchableOpacity>
@@ -604,96 +613,90 @@ export default function ConsultationScreen() {
           {/* Language filters */}
           {LANGUAGES.map(lang=>(
             <TouchableOpacity key={lang}
-              style={[s.filterChip, activeLang===lang && { backgroundColor:"rgba(124,58,237,0.2)", borderColor:"rgba(167,139,250,0.6)" }]}
+              style={[s.filterChip, activeLang===lang && { backgroundColor:"rgba(30,58,138,0.2)", borderColor:"rgba(96,165,250,0.6)" }]}
               onPress={()=>setActiveLang(activeLang===lang ? "All" : lang)}>
-              <Text style={[s.filterChipTxt, { color:activeLang===lang?"#a78bfa":"rgba(255,255,255,0.65)" }]}>{lang}</Text>
+              <Text style={[s.filterChipTxt, { color:activeLang===lang?"#60a5fa":"rgba(255,255,255,0.65)" }]}>{lang}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </Animated.View>
 
-      <ScrollView
-        style={{ flex:1 }} showsVerticalScrollIndicator={false}
-        onScroll={handleScroll} scrollEventThrottle={16}
-        contentContainerStyle={{ paddingTop:HEADER_H+8, paddingBottom:100, paddingHorizontal:16 }}>
-
-        {/* Hero */}
-        <View style={[s.heroCard, { backgroundColor:isDark?"rgba(124,58,237,0.12)":"rgba(124,58,237,0.06)", borderColor:t.border }]}>
-          <Text style={[s.heroTitle, { color:t.text }]}>
-            Talk To{"\n"}
-            <Text style={s.heroAccent}>Expert Healers</Text>
-          </Text>
-          <Text style={[s.heroSub, { color:t.textMuted }]}>
-            India's finest hypnotherapists, shadow work experts & NLP coaches. Deeply personal. Completely confidential.
-          </Text>
-          <View style={s.heroTags}>
-            {[["⭐","4.9 Rating"],["🔒","Confidential"],["⚡","24hr Response"],["💬","Chat Free"]].map(([ic,lb])=>(
-              <View key={lb} style={[s.heroTag, { backgroundColor:isDark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)" }]}>
-                <Text style={[s.heroTagTxt, { color:t.textMuted }]}>{ic} {lb}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Specialty tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:16 }} contentContainerStyle={{ gap:8, paddingVertical:4 }}>
-          {allSpecs.map(spec => {
-            const active = activeSpec === spec;
-            return (
-              <TouchableOpacity key={spec} onPress={()=>setActiveSpec(spec)}
-                style={[s.specTab, active && { borderColor:"#7c3aed", backgroundColor:"rgba(124,58,237,0.14)" }]}>
-                <Text style={[s.specTabTxt, { color:active?"#a78bfa":t.textMuted }]}>
-                  {spec}{spec !== "All" && <Text style={{ opacity:0.6 }}> ({experts.filter(e=>e.subject===spec).length})</Text>}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Section heading */}
-        <View style={s.secHeadRow}>
-          <View>
-            <Text style={[s.secHeadTitle, { color:t.text }]}>
-              {activeSpec === "All" ? "All Expert Healers" : activeSpec}
-            </Text>
-            <Text style={[s.secHeadSub, { color:t.textMuted }]}>
-              {filtered.length} experts · {filtered.filter(e=>e.isOnline).length} online now
-            </Text>
-          </View>
-          <View style={s.liveCountBadge}>
-            <Animated.View style={[s.liveCountDot, { transform:[{scale:pulseAnim}] }]} />
-            <Text style={s.liveCountTxt}>{filtered.filter(e=>e.isOnline).length} Live</Text>
-          </View>
-        </View>
-
-        {/* Expert cards */}
-        {loading ? (
-          <View style={s.loadingBox}>
-            <ActivityIndicator color="#7c3aed" size="large" />
-            <Text style={[{ color:t.textMuted, marginTop:12, fontSize:13 }]}>Loading healers…</Text>
-          </View>
-        ) : filtered.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={{ fontSize:40, marginBottom:12 }}>🔍</Text>
-            <Text style={[{ color:t.textMuted, fontSize:15 }]}>No experts match your filters.</Text>
-          </View>
-        ) : (
-          filtered.map(expert => (
-            <ExpertCard
-              key={expert._id}
-              expert={expert}
-              t={t}
-              isDark={isDark}
-              onApply={() => handleApply(expert)}
-              onChat={() => setChatting(expert)}
-              onBook={() => handleBook(expert)}
-            />
-          ))
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item._id}
+        renderItem={({ item }) => (
+          <ExpertCard
+            expert={item} t={t} isDark={isDark}
+            onApply={() => handleApply(item)}
+            onChat={() => setChatting(item)}
+            onBook={() => handleBook(item)}
+          />
         )}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        windowSize={5}
+        maxToRenderPerBatch={4}
+        initialNumToRender={4}
+        removeClippedSubviews
+        contentContainerStyle={{ paddingTop:HEADER_H+8, paddingBottom:100, paddingHorizontal:16 }}
+        ListHeaderComponent={
+          <>
+            <View style={[s.heroCard, { backgroundColor:isDark?"rgba(30,58,138,0.12)":"rgba(30,58,138,0.06)", borderColor:t.border }]}>
+              <Text style={[s.heroTitle, { color:t.text }]}>Talk To{"\n"}<Text style={s.heroAccent}>Expert Healers</Text></Text>
+              <Text style={[s.heroSub, { color:t.textMuted }]}>
+                India's finest hypnotherapists, shadow work experts & NLP coaches. Deeply personal. Completely confidential.
+              </Text>
+              <View style={s.heroTags}>
+                {[["⭐","4.9 Rating"],["🔒","Confidential"],["⚡","24hr Response"],["💬","Chat Free"]].map(([ic,lb])=>(
+                  <View key={lb} style={[s.heroTag, { backgroundColor:isDark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)" }]}>
+                    <Text style={[s.heroTagTxt, { color:t.textMuted }]}>{ic} {lb}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
 
-        {/* Bottom CTA */}
-        {!loading && filtered.length > 0 && (
-          <View style={[s.ctaCard, { backgroundColor:isDark?"rgba(124,58,237,0.1)":"rgba(124,58,237,0.06)", borderColor:t.border }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:16 }} contentContainerStyle={{ gap:8, paddingVertical:4 }}>
+              {allSpecs.map(spec => {
+                const active = activeSpec === spec;
+                return (
+                  <TouchableOpacity key={spec} onPress={()=>setActiveSpec(spec)}
+                    style={[s.specTab, active && { borderColor:"#0c2461", backgroundColor:"rgba(30,58,138,0.14)" }]}>
+                    <Text style={[s.specTabTxt, { color:active?"#60a5fa":t.textMuted }]}>
+                      {spec}{spec !== "All" && <Text style={{ opacity:0.6 }}> ({specCountMap[spec] ?? 0})</Text>}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={s.secHeadRow}>
+              <View>
+                <Text style={[s.secHeadTitle, { color:t.text }]}>{activeSpec === "All" ? "All Expert Healers" : activeSpec}</Text>
+                <Text style={[s.secHeadSub, { color:t.textMuted }]}>{filtered.length} experts · {filtered.filter(e=>e.isOnline).length} online now</Text>
+              </View>
+              <View style={s.liveCountBadge}>
+                <Animated.View style={[s.liveCountDot, { transform:[{scale:pulseAnim}] }]} />
+                <Text style={s.liveCountTxt}>{filtered.filter(e=>e.isOnline).length} Live</Text>
+              </View>
+            </View>
+
+            {loading && (
+              <View style={s.loadingBox}>
+                <ActivityIndicator color="#0c2461" size="large" />
+                <Text style={{ color:t.textMuted, marginTop:12, fontSize:13 }}>Loading healers…</Text>
+              </View>
+            )}
+            {!loading && filtered.length === 0 && (
+              <View style={s.emptyBox}>
+                <Text style={{ fontSize:40, marginBottom:12 }}>🔍</Text>
+                <Text style={{ color:t.textMuted, fontSize:15 }}>No experts match your filters.</Text>
+              </View>
+            )}
+          </>
+        }
+        ListFooterComponent={!loading && filtered.length > 0 ? (
+          <View style={[s.ctaCard, { backgroundColor:isDark?"rgba(30,58,138,0.1)":"rgba(30,58,138,0.06)", borderColor:t.border }]}>
             <Text style={{ fontSize:32, marginBottom:8, textAlign:"center" }}>🙏</Text>
             <Text style={[s.ctaTitle, { color:t.text }]}>Not sure which expert is right?</Text>
             <Text style={[s.ctaSub, { color:t.textMuted }]}>Chat free and we'll match you with the perfect healer.</Text>
@@ -701,8 +704,8 @@ export default function ConsultationScreen() {
               <Text style={s.ctaBtnTxt}>✨ Get Matched For Free</Text>
             </TouchableOpacity>
           </View>
-        )}
-      </ScrollView>
+        ) : null}
+      />
 
       {/* Modals */}
       {applying && (
@@ -749,7 +752,7 @@ const s = StyleSheet.create({
 
   heroCard: { borderRadius:18, padding:20, marginBottom:20, borderWidth:1 },
   heroTitle: { fontSize:26, fontWeight:"900", lineHeight:32, marginBottom:8 },
-  heroAccent: { color:"#7c3aed" },
+  heroAccent: { color:"#0c2461" },
   heroSub: { fontSize:13, lineHeight:20, marginBottom:14 },
   heroTags: { flexDirection:"row", flexWrap:"wrap", gap:8 },
   heroTag: { borderRadius:20, paddingHorizontal:10, paddingVertical:5 },
@@ -771,6 +774,6 @@ const s = StyleSheet.create({
   ctaCard: { borderRadius:18, padding:24, marginTop:8, alignItems:"center", borderWidth:1 },
   ctaTitle: { fontSize:17, fontWeight:"800", marginBottom:8, textAlign:"center" },
   ctaSub: { fontSize:13, textAlign:"center", lineHeight:20, marginBottom:20 },
-  ctaBtn: { backgroundColor:"#7c3aed", borderRadius:50, paddingHorizontal:28, paddingVertical:13 },
+  ctaBtn: { backgroundColor:"#0c2461", borderRadius:50, paddingHorizontal:28, paddingVertical:13 },
   ctaBtnTxt: { color:"#fff", fontWeight:"800", fontSize:14 },
 });

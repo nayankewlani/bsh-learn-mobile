@@ -1,8 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Linking, Dimensions,
+  Linking, Dimensions,
 } from "react-native";
+import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +33,7 @@ const PROFILES: Record<string, {
     role: "Founder & Chief Mentor, BSH Healers",
     tagline: "India's #1 Clinical Hypnotherapist with 20+ years of transforming lives",
     bgColor: "#1a0a3e",
-    accentColor: "#7c3aed",
+    accentColor: "#FF1E56",
     img: slide1,
     bio: [
       "Dr. Pradeep Kumar is India's most sought-after Clinical Hypnotherapist, NLP Master, and Mind Coach. With over 20 years of practice, he has trained more than 5,000+ certified practitioners across 15+ countries.",
@@ -67,7 +68,7 @@ const PROFILES: Record<string, {
       { icon: "logo-facebook",   label: "Facebook",  url: "https://www.facebook.com/drpradeepkumar",                   color: "#1877f2" },
       { icon: "logo-linkedin",   label: "LinkedIn",  url: "https://www.linkedin.com/in/drpradeepkumar3912",             color: "#0a66c2" },
       { icon: "logo-twitter",    label: "Twitter/X", url: "https://x.com/pradeep23923",                                color: "#1da1f2" },
-      { icon: "globe-outline",   label: "Website",   url: "https://www.blessingsschoolofhypnosis.com",                 color: "#7c3aed" },
+      { icon: "globe-outline",   label: "Website",   url: "https://www.blessingsschoolofhypnosis.com",                 color: "#FF1E56" },
     ],
     ctaLabel: "Book 1:1 Session with Dr. Pradeep",
     ctaAction: "consultation",
@@ -79,7 +80,7 @@ const PROFILES: Record<string, {
     role: "Co-Founder & Lead Healer, BSH Healers",
     tagline: "Pioneering Shadow Work & Emotional Healing in India since 2012",
     bgColor: "#0d1a0a",
-    accentColor: "#0d9488",
+    accentColor: "#FF1E56",
     img: geetaImg,
     bio: [
       "Geeta Makhijani is India's foremost Shadow Work specialist and Emotional Healing expert. She co-founded BSH Healers and has developed a unique healing methodology that blends Jungian psychology, energy work, and spiritual practices.",
@@ -111,7 +112,7 @@ const PROFILES: Record<string, {
     social: [
       { icon: "logo-youtube",    label: "YouTube",   url: "https://www.youtube.com/@drpradeepkumar3912",  color: "#ff0000" },
       { icon: "logo-instagram",  label: "Instagram", url: "https://www.instagram.com/drpradeepkumarofficial/", color: "#e1306c" },
-      { icon: "globe-outline",   label: "Website",   url: "https://www.blessingsschoolofhypnosis.com",    color: "#0d9488" },
+      { icon: "globe-outline",   label: "Website",   url: "https://www.blessingsschoolofhypnosis.com",    color: "#FF1E56" },
     ],
     ctaLabel: "Book 1:1 Session with Geeta",
     ctaAction: "consultation",
@@ -131,7 +132,7 @@ export default function EducatorProfileScreen() {
       <View style={{ flex:1, alignItems:"center", justifyContent:"center", backgroundColor:t.bg }}>
         <Text style={{ color:t.text, fontSize:16 }}>Profile not found</Text>
         <TouchableOpacity onPress={()=>router.back()} style={{ marginTop:16 }}>
-          <Text style={{ color:"#7c3aed", fontSize:14 }}>← Go Back</Text>
+          <Text style={{ color:"#FF1E56", fontSize:14 }}>← Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -151,7 +152,7 @@ export default function EducatorProfileScreen() {
           </TouchableOpacity>
           <View style={s.heroInner}>
             <View style={[s.heroImgWrap, { borderColor:accentColor }]}>
-              <Image source={img} style={s.heroImg} resizeMode="cover" />
+              <Image source={img} style={s.heroImg} contentFit="cover" cachePolicy="disk" />
             </View>
             <View style={[s.verifiedBadge, { backgroundColor:accentColor }]}>
               <Ionicons name="checkmark-circle" size={12} color="#fff" />
@@ -204,7 +205,7 @@ export default function EducatorProfileScreen() {
         {/* Specialties */}
         <View style={[s.section, { backgroundColor:t.surface }]}>
           <View style={s.sectionHeader}>
-            <View style={[s.sectionDot, { backgroundColor:"#a78bfa" }]} />
+            <View style={[s.sectionDot, { backgroundColor:"#FF6B8A" }]} />
             <Text style={[s.sectionTitle, { color:t.text }]}>Specialties</Text>
           </View>
           <View style={s.tagWrap}>
@@ -219,7 +220,7 @@ export default function EducatorProfileScreen() {
         {/* Social links */}
         <View style={[s.section, { backgroundColor:t.bg }]}>
           <View style={s.sectionHeader}>
-            <View style={[s.sectionDot, { backgroundColor:"#60a5fa" }]} />
+            <View style={[s.sectionDot, { backgroundColor:"#FF6B8A" }]} />
             <Text style={[s.sectionTitle, { color:t.text }]}>Connect</Text>
           </View>
           <View style={{ gap:10 }}>

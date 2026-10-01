@@ -1,16 +1,17 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Dimensions, Animated, NativeSyntheticEvent, NativeScrollEvent,
+  View, Text, FlatList, ScrollView, TouchableOpacity, StyleSheet,
+  Dimensions, Animated, NativeSyntheticEvent, NativeScrollEvent,
   TextInput,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../stores/authStore";
 import { useCourseStore, Course } from "../../stores/courseStore";
+import { useHomeStore } from "../../stores/homeStore";
 import { COLORS } from "../../constants";
-import client from "../../api/client";
 
 interface ApiProgram {
   _id: string; programId: string; title: string; description: string;
@@ -69,10 +70,10 @@ const STATIC_PROGRAMS = [
 ];
 
 const PROG_LABEL_COLOR: Record<string, string> = {
-  Certification: "#7c3aed",
-  Subscription:  "#0d9488",
+  Certification: "#0c2461",
+  Subscription:  "#0c2461",
   "Tool Pack":   "#d97706",
-  default:       "#1d4ed8",
+  default:       "#1e3a8a",
 };
 
 // Always use bundled images for these programs — API thumbnails may be stale/expired
@@ -126,7 +127,8 @@ export default function ExploreScreen() {
   const [selectedCat, setSelectedCat] = useState(params.category || "All");
   const [sortBy, setSortBy] = useState<"popular" | "newest" | "price">("popular");
   const [showSort, setShowSort] = useState(false);
-  const [apiPrograms, setApiPrograms] = useState<ApiProgram[]>([]);
+  // Use homeStore programs (already fetched on home tab) — no duplicate API call
+  const apiPrograms = useHomeStore((s) => s.apiPrograms) as ApiProgram[];
 
   // Floating header
   const HEADER_H = 128 + insets.top;
@@ -134,7 +136,7 @@ export default function ExploreScreen() {
   const lastScrollYRef = useRef(0);
   const headerHiddenRef = useRef(false);
 
-  const handleMainScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const delta = y - lastScrollYRef.current;
     lastScrollYRef.current = y;
@@ -152,38 +154,197 @@ export default function ExploreScreen() {
       headerHiddenRef.current = false;
       Animated.timing(headerTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (params.category) setSelectedCat(params.category);
   }, [params.category]);
 
+  // Debounced search — wait 400ms after last keystroke before hitting API
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
-    client.get("/courses/programs/public")
-      .then(({ data }) => setApiPrograms(data.programs ?? []))
-      .catch(() => {});
-  }, []);
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     const p: Record<string, string | number> = { limit: 20 };
-    if (search) p.search = search;
+    if (debouncedSearch) p.search = debouncedSearch;
     if (selectedCat !== "All") p.category = selectedCat;
     fetchCourses(p);
-  }, [search, selectedCat]);
+  }, [debouncedSearch, selectedCat]);
 
   // Use API data if available, else static fallback
   const apiCourses = courses as Course[];
   const displayStatic = !isLoading && apiCourses.length === 0;
 
-  const filteredStatic = STATIC_COURSES.filter(c => {
+  const filteredStatic = useMemo(() => STATIC_COURSES.filter(c => {
     const matchCat = selectedCat === "All" || c.category === selectedCat;
     const matchSearch = !search || c.title.toLowerCase().includes(search.toLowerCase()) || c.educator.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
-  });
+  }), [selectedCat, search]);
 
   const totalCount = displayStatic ? filteredStatic.length : apiCourses.length;
 
   const SORT_LABELS: Record<string, string> = { popular: "Most Popular", newest: "Newest First", price: "Price: Low to High" };
+
+  // Memoized renderItem — stable reference prevents per-card re-renders on scroll
+  const renderCourseItem = useCallback(({ item }: { item: StaticCourse }) => (
+    <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+      <StaticCourseCard course={item as StaticCourse} />
+    </View>
+  ), []);
+
+  // Memoized header — only re-renders when programs/categories/loading state changes
+  const listHeader = useMemo(() => (
+    <View>
+      {/* ── Flagship Programs ── */}
+      <View style={styles.flagshipSection}>
+        <View style={styles.flagshipHeader}>
+          <Text style={styles.flagshipTitle}>Flagship Programs</Text>
+        </View>
+
+        {(apiPrograms.length > 0 ? apiPrograms : STATIC_PROGRAMS).map((prog: any) => {
+          const typeLabel = prog.programType || "Course";
+          const labelColor = PROG_LABEL_COLOR[typeLabel] ?? PROG_LABEL_COLOR.default;
+          const priceRs = prog.discountPrice > 0
+            ? Math.round(prog.discountPrice / 100)
+            : Math.round(prog.price / 100);
+          const priceStr = typeLabel === "Subscription"
+            ? `₹${priceRs}/mo`
+            : `₹${priceRs.toLocaleString("en-IN")}`;
+          const localImg = FLAGSHIP_IMG[prog.programId] ?? prog.img ?? advHypnosisImg;
+          const slug = prog.programId;
+          const active = prog.isActive !== false;
+
+          return (
+            <TouchableOpacity key={prog.programId ?? prog._id}
+              activeOpacity={active ? 0.9 : 1}
+              style={styles.flagshipCard}
+              onPress={() => active && router.push(`/program/${slug}` as any)}>
+
+              {prog.programType === "Certification" && (
+                <View style={[styles.flagshipTypeBadge, { backgroundColor: labelColor, opacity: active ? 1 : 0.4 }]}>
+                  <Text style={styles.flagshipTypeTxt}>Certification</Text>
+                </View>
+              )}
+
+              <View style={styles.flagshipImgBox}>
+                <Image source={localImg} style={[styles.flagshipImg, !active && { opacity: 0.4 }]} contentFit="cover" />
+                <View style={styles.flagshipImgDim} />
+                {!active && (
+                  <View style={styles.flagshipStartingSoonBox}>
+                    <Text style={styles.flagshipStartingSoonTxt}>STARTING SOON</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={[styles.flagshipInfo, !active && { opacity: 0.45 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  {prog.level && (
+                    <View style={styles.levelBadge}>
+                      <Text style={styles.levelTxt}>{prog.level}</Text>
+                    </View>
+                  )}
+                  {prog.programId === "advance-hypnosis" && (
+                    <View style={styles.certifiedBadge}>
+                      <Text style={styles.certifiedTxt}>BSH Healers Certified</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.flagshipName}>{prog.title}</Text>
+                <Text style={styles.flagshipDesc} numberOfLines={2}>{prog.description}</Text>
+                <View style={styles.flagshipPriceRow}>
+                  <Text style={styles.flagshipPrice}>{priceStr}</Text>
+                  {active ? (
+                    <TouchableOpacity style={styles.viewProgramBtn}
+                      onPress={() => router.push(`/program/${slug}` as any)}>
+                      <Text style={styles.viewProgramTxt}>View Program</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.viewProgramBtn, { backgroundColor: "#1f1f35", borderColor: "#2d2b52" }]}>
+                      <Text style={[styles.viewProgramTxt, { color: "#4b5563" }]}>Coming Soon</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Stats Strip */}
+      <View style={styles.statsStrip}>
+        {[
+          { val: "50K+", lbl: "Students",  icon: "people-outline"    as IoniconName },
+          { val: "100+", lbl: "Courses",   icon: "book-outline"      as IoniconName },
+          { val: "4.8★", lbl: "Rating",   icon: "star-outline"      as IoniconName },
+          { val: "15+",  lbl: "Trainers",  icon: "school-outline"    as IoniconName },
+        ].map(s => (
+          <View key={s.lbl} style={styles.statItem}>
+            <Ionicons name={s.icon} size={18} color="#60a5fa" style={{ marginBottom: 4 }} />
+            <Text style={styles.statVal}>{s.val}</Text>
+            <Text style={styles.statLbl}>{s.lbl}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Category Filter */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}
+        contentContainerStyle={{ paddingHorizontal: 16, flexDirection: "row", alignItems: "center" }}>
+        {CATEGORIES.map((cat, idx) => {
+          const active = cat.name === selectedCat;
+          return (
+            <TouchableOpacity key={cat.name} onPress={() => setSelectedCat(cat.name)}
+              style={[styles.catChip, active && styles.catChipActive, idx < CATEGORIES.length - 1 && { marginRight: 8 }]}>
+              <Ionicons name={cat.icon} size={13} color={active ? "#fff" : "#6b7280"} style={{ marginRight: 5 }} />
+              <Text style={[styles.catChipTxt, active && styles.catChipTxtActive]}>{cat.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Results row + Sort */}
+      <View style={styles.resultsRow}>
+        <Text style={styles.resultsCount}>
+          <Text style={{ color: "#60a5fa", fontWeight: "800" }}>{totalCount}</Text> courses found
+        </Text>
+        <TouchableOpacity style={styles.sortBtn} onPress={() => setShowSort(s => !s)}>
+          <Ionicons name="funnel-outline" size={13} color="#60a5fa" />
+          <Text style={styles.sortTxt}>{SORT_LABELS[sortBy]}</Text>
+          <Ionicons name={showSort ? "chevron-up" : "chevron-down"} size={13} color="#60a5fa" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sort Dropdown */}
+      {showSort && (
+        <View style={styles.sortDropdown}>
+          {(["popular", "newest", "price"] as const).map(opt => (
+            <TouchableOpacity key={opt} style={styles.sortOption} onPress={() => { setSortBy(opt); setShowSort(false); }}>
+              <Text style={[styles.sortOptionTxt, sortBy === opt && styles.sortOptionActive]}>{SORT_LABELS[opt]}</Text>
+              {sortBy === opt && <Ionicons name="checkmark" size={14} color="#60a5fa" />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Skeleton while loading */}
+      {isLoading && (
+        <View style={{ paddingHorizontal: 16, gap: 16 }}>
+          {[1, 2, 3].map(n => (
+            <View key={n} style={styles.skeleton}>
+              <View style={styles.skeletonImg} />
+              <View style={{ padding: 14 }}>
+                <View style={[styles.skeletonLine, { width: "90%", marginBottom: 10 }]} />
+                <View style={[styles.skeletonLine, { width: "60%", marginBottom: 10 }]} />
+                <View style={[styles.skeletonLine, { width: "40%" }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  ), [apiPrograms, selectedCat, sortBy, showSort, totalCount, isLoading]);
 
   return (
     <View style={styles.root}>
@@ -191,7 +352,7 @@ export default function ExploreScreen() {
       {/* ── Floating Header ── */}
       <Animated.View style={[styles.headerWrapper, { paddingTop: insets.top, transform: [{ translateY: headerTranslateY }] }]}>
         <View style={styles.headerRow}>
-          <Image source={bshLogoImg} style={styles.headerLogo} resizeMode="contain" />
+          <Image source={bshLogoImg} style={styles.headerLogo} contentFit="contain" />
           <View style={styles.brandArea}>
             <Text style={styles.brandName}>BSH</Text>
             <Text style={styles.brandSub}>Courses</Text>
@@ -199,7 +360,7 @@ export default function ExploreScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity onPress={() => router.push(user ? "/(tabs)/dashboard" : "/(auth)/login")}>
               {user?.avatar ? (
-                <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                <Image source={{ uri: user.avatar }} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
                 <View style={styles.avatarDefault}>
                   <Text style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase() ?? "B"}</Text>
@@ -226,196 +387,46 @@ export default function ExploreScreen() {
         </View>
       </Animated.View>
 
-      {/* ── Main Scroll ── */}
-      <ScrollView
+      {/* ── Main FlatList (course cards virtualized) ── */}
+      <FlatList
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         onScroll={handleMainScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: HEADER_H + 8, paddingBottom: 56 }}
-      >
-        {/* ── Flagship Programs ── */}
-        <View style={styles.flagshipSection}>
-          <View style={styles.flagshipHeader}>
-            <Text style={styles.flagshipTitle}>Flagship Programs</Text>
-          </View>
-
-          {(apiPrograms.length > 0 ? apiPrograms : STATIC_PROGRAMS).map((prog: any) => {
-            const typeLabel = prog.programType || "Course";
-            const labelColor = PROG_LABEL_COLOR[typeLabel] ?? PROG_LABEL_COLOR.default;
-            const priceRs = prog.discountPrice > 0
-              ? Math.round(prog.discountPrice / 100)
-              : Math.round(prog.price / 100);
-            const priceStr = typeLabel === "Subscription"
-              ? `₹${priceRs}/mo`
-              : `₹${priceRs.toLocaleString("en-IN")}`;
-            const localImg = FLAGSHIP_IMG[prog.programId] ?? prog.img ?? advHypnosisImg;
-            const slug = prog.programId;
-            const active = prog.isActive !== false; // API programs are always active
-
-            return (
-              <TouchableOpacity key={prog.programId ?? prog._id}
-                activeOpacity={active ? 0.9 : 1}
-                style={styles.flagshipCard}
-                onPress={() => active && router.push(`/program/${slug}` as any)}>
-
-                {/* Type badge — only shown for Certification (Advance Hypnosis) */}
-                {prog.programType === "Certification" && (
-                  <View style={[styles.flagshipTypeBadge, { backgroundColor: labelColor, opacity: active ? 1 : 0.4 }]}>
-                    <Text style={styles.flagshipTypeTxt}>Certification</Text>
-                  </View>
-                )}
-
-                {/* Image — prefer bundled asset for known programs to avoid stale API URLs */}
-                <View style={styles.flagshipImgBox}>
-                  <Image source={localImg} style={[styles.flagshipImg, !active && { opacity: 0.4 }]} resizeMode="cover" />
-                  <View style={styles.flagshipImgDim} />
-                  {/* Starting Soon badge over image */}
-                  {!active && (
-                    <View style={styles.flagshipStartingSoonBox}>
-                      <Text style={styles.flagshipStartingSoonTxt}>STARTING SOON</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Info */}
-                <View style={[styles.flagshipInfo, !active && { opacity: 0.45 }]}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    {prog.level && (
-                      <View style={styles.levelBadge}>
-                        <Text style={styles.levelTxt}>{prog.level}</Text>
-                      </View>
-                    )}
-                    {prog.programId === "advance-hypnosis" && (
-                      <View style={styles.certifiedBadge}>
-                        <Text style={styles.certifiedTxt}>BSH Healers Certified</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.flagshipName}>{prog.title}</Text>
-                  <Text style={styles.flagshipDesc} numberOfLines={2}>{prog.description}</Text>
-                  <View style={styles.flagshipPriceRow}>
-                    <Text style={styles.flagshipPrice}>{priceStr}</Text>
-                    {active ? (
-                      <TouchableOpacity style={styles.viewProgramBtn}
-                        onPress={() => router.push(`/program/${slug}` as any)}>
-                        <Text style={styles.viewProgramTxt}>View Program</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={[styles.viewProgramBtn, { backgroundColor: "#1f1f35", borderColor: "#2d2b52" }]}>
-                        <Text style={[styles.viewProgramTxt, { color: "#4b5563" }]}>Coming Soon</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
+        data={isLoading ? [] : (displayStatic ? filteredStatic : apiCourses as unknown as StaticCourse[])}
+        keyExtractor={(item) => String((item as StaticCourse).id ?? (item as any)._id)}
+        renderItem={renderCourseItem}
+        removeClippedSubviews
+        maxToRenderPerBatch={5}
+        windowSize={10}
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={[styles.emptyState, { marginHorizontal: 16 }]}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="search-outline" size={40} color="#0c2461" />
+              </View>
+              <Text style={styles.emptyTitle}>No courses found</Text>
+              <Text style={styles.emptySub}>Try a different category or search term</Text>
+              <TouchableOpacity style={styles.emptyBtn} onPress={() => { setSearch(""); setSelectedCat("All"); }}>
+                <Text style={styles.emptyBtnTxt}>Clear Filters</Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Stats Strip */}
-        <View style={styles.statsStrip}>
-          {[
-            { val: "50K+", lbl: "Students",  icon: "people-outline"    as IoniconName },
-            { val: "100+", lbl: "Courses",   icon: "book-outline"      as IoniconName },
-            { val: "4.8★", lbl: "Rating",   icon: "star-outline"      as IoniconName },
-            { val: "15+",  lbl: "Trainers",  icon: "school-outline"    as IoniconName },
-          ].map(s => (
-            <View key={s.lbl} style={styles.statItem}>
-              <Ionicons name={s.icon} size={18} color="#a78bfa" style={{ marginBottom: 4 }} />
-              <Text style={styles.statVal}>{s.val}</Text>
-              <Text style={styles.statLbl}>{s.lbl}</Text>
             </View>
-          ))}
-        </View>
-
-        {/* Category Filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}
-          contentContainerStyle={{ paddingHorizontal: 16, flexDirection: "row", alignItems: "center" }}>
-          {CATEGORIES.map((cat, idx) => {
-            const active = cat.name === selectedCat;
-            return (
-              <TouchableOpacity key={cat.name} onPress={() => setSelectedCat(cat.name)}
-                style={[styles.catChip, active && styles.catChipActive, idx < CATEGORIES.length - 1 && { marginRight: 8 }]}>
-                <Ionicons name={cat.icon} size={13} color={active ? "#fff" : "#6b7280"} style={{ marginRight: 5 }} />
-                <Text style={[styles.catChipTxt, active && styles.catChipTxtActive]}>{cat.name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Results row + Sort */}
-        <View style={styles.resultsRow}>
-          <Text style={styles.resultsCount}>
-            <Text style={{ color: "#a78bfa", fontWeight: "800" }}>{totalCount}</Text> courses found
-          </Text>
-          <TouchableOpacity style={styles.sortBtn} onPress={() => setShowSort(s => !s)}>
-            <Ionicons name="funnel-outline" size={13} color="#a78bfa" />
-            <Text style={styles.sortTxt}>{SORT_LABELS[sortBy]}</Text>
-            <Ionicons name={showSort ? "chevron-up" : "chevron-down"} size={13} color="#a78bfa" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Sort Dropdown */}
-        {showSort && (
-          <View style={styles.sortDropdown}>
-            {(["popular", "newest", "price"] as const).map(opt => (
-              <TouchableOpacity key={opt} style={styles.sortOption} onPress={() => { setSortBy(opt); setShowSort(false); }}>
-                <Text style={[styles.sortOptionTxt, sortBy === opt && styles.sortOptionActive]}>{SORT_LABELS[opt]}</Text>
-                {sortBy === opt && <Ionicons name="checkmark" size={14} color="#a78bfa" />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* ── Course List ── */}
-        {isLoading ? (
-          // Skeleton
-          <View style={{ paddingHorizontal: 16, gap: 16 }}>
-            {[1, 2, 3].map(n => (
-              <View key={n} style={styles.skeleton}>
-                <View style={styles.skeletonImg} />
-                <View style={{ padding: 14 }}>
-                  <View style={[styles.skeletonLine, { width: "90%", marginBottom: 10 }]} />
-                  <View style={[styles.skeletonLine, { width: "60%", marginBottom: 10 }]} />
-                  <View style={[styles.skeletonLine, { width: "40%" }]} />
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
-            {(displayStatic ? filteredStatic : apiCourses as unknown as StaticCourse[]).length === 0 ? (
-              // Empty state
-              <View style={styles.emptyState}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons name="search-outline" size={40} color="#7c3aed" />
-                </View>
-                <Text style={styles.emptyTitle}>No courses found</Text>
-                <Text style={styles.emptySub}>Try a different category or search term</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => { setSearch(""); setSelectedCat("All"); }}>
-                  <Text style={styles.emptyBtnTxt}>Clear Filters</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              (displayStatic ? filteredStatic : apiCourses as unknown as StaticCourse[]).map((course) => (
-                <StaticCourseCard key={(course as StaticCourse).id || (course as any)._id} course={course as StaticCourse} />
-              ))
-            )}
-          </View>
-        )}
-      </ScrollView>
+          ) : null
+        }
+        ListHeaderComponent={listHeader}
+      />
     </View>
   );
 }
 
 // ── Rich Course Card ──────────────────────────────────────────────────────────
-function StaticCourseCard({ course }: { course: StaticCourse }) {
+const StaticCourseCard = React.memo(function StaticCourseCard({ course }: { course: StaticCourse }) {
   return (
     <View style={[cardStyles.card, cardStyles.cardDimmed]}>
       {/* Image */}
       <View style={cardStyles.imgWrapper}>
-        <Image source={course.img} style={[cardStyles.img, { opacity: 0.45 }]} resizeMode="cover" />
+        <Image source={course.img} style={[cardStyles.img, { opacity: 0.45 }]} contentFit="cover" />
         <View style={cardStyles.imgDim} />
         {/* Dark overlay for coming soon */}
         <View style={cardStyles.comingSoonOverlay}>
@@ -445,7 +456,7 @@ function StaticCourseCard({ course }: { course: StaticCourse }) {
 
         {/* Educator */}
         <View style={cardStyles.educatorRow}>
-          <Ionicons name="person-circle-outline" size={15} color="#a78bfa" />
+          <Ionicons name="person-circle-outline" size={15} color="#60a5fa" />
           <Text style={cardStyles.educatorTxt}>{typeof course.educator === "string" ? course.educator : (course.educator as any)?.name ?? ""}</Text>
         </View>
 
@@ -491,14 +502,14 @@ function StaticCourseCard({ course }: { course: StaticCourse }) {
       </View>
     </View>
   );
-}
+});
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
 
   headerWrapper: {
-    backgroundColor: "#2d0a6e",
+    backgroundColor: "#0f2557",
     paddingHorizontal: 16, paddingBottom: 14,
     position: "absolute", top: 0, left: 0, right: 0, zIndex: 100,
     elevation: 10,
@@ -529,12 +540,12 @@ const styles = StyleSheet.create({
   flagshipTitle: { color: COLORS.text, fontSize: 20, fontWeight: "900" },
   certifiedBadge: {
     backgroundColor: "rgba(13,148,136,0.15)", borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#0d948855",
+    paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#0c246155",
   },
-  certifiedTxt: { color: "#0d9488", fontSize: 11, fontWeight: "700" },
+  certifiedTxt: { color: "#0c2461", fontSize: 11, fontWeight: "700" },
   flagshipCard: {
-    backgroundColor: "#13122a", borderRadius: 18, marginBottom: 16,
-    overflow: "hidden", borderWidth: 1, borderColor: "#1e1b4b",
+    backgroundColor: "#071528", borderRadius: 18, marginBottom: 16,
+    overflow: "hidden", borderWidth: 1, borderColor: "#0f2557",
     shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
   },
   flagshipTypeBadge: {
@@ -551,8 +562,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(6,3,20,0.55)",
   },
   flagshipStartingSoonTxt: {
-    color: "#a78bfa", fontSize: 16, fontWeight: "900", letterSpacing: 2,
-    borderWidth: 1.5, borderColor: "rgba(124,58,237,0.6)",
+    color: "#60a5fa", fontSize: 16, fontWeight: "900", letterSpacing: 2,
+    borderWidth: 1.5, borderColor: "rgba(30,58,138,0.6)",
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10,
     backgroundColor: "rgba(10,6,30,0.85)",
   },
@@ -568,7 +579,7 @@ const styles = StyleSheet.create({
   flagshipPriceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   flagshipPrice: { color: "#f3f4f6", fontSize: 22, fontWeight: "900" },
   viewProgramBtn: {
-    backgroundColor: "#7c3aed", borderRadius: 10,
+    backgroundColor: "#0c2461", borderRadius: 10,
     paddingHorizontal: 18, paddingVertical: 10,
   },
   viewProgramTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
@@ -576,8 +587,8 @@ const styles = StyleSheet.create({
   statsStrip: {
     flexDirection: "row", justifyContent: "space-around",
     marginHorizontal: 16, marginBottom: 12,
-    backgroundColor: "#13122a", borderRadius: 16,
-    paddingVertical: 14, borderWidth: 1, borderColor: "#1e1b4b",
+    backgroundColor: "#071528", borderRadius: 16,
+    paddingVertical: 14, borderWidth: 1, borderColor: "#0f2557",
   },
   statItem: { alignItems: "center" },
   statVal: { color: "#f3f4f6", fontSize: 15, fontWeight: "900" },
@@ -587,9 +598,9 @@ const styles = StyleSheet.create({
   catChip: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1.5, borderColor: "#3730a3",
+    borderWidth: 1.5, borderColor: "#0c2461",
   },
-  catChipActive: { backgroundColor: "#7c3aed", borderColor: "#7c3aed" },
+  catChipActive: { backgroundColor: "#0c2461", borderColor: "#0c2461" },
   catChipTxt: { color: "#6b7280", fontSize: 12, fontWeight: "600" },
   catChipTxtActive: { color: "#fff" },
 
@@ -600,46 +611,46 @@ const styles = StyleSheet.create({
   resultsCount: { color: COLORS.textMuted, fontSize: 13 },
   sortBtn: {
     flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(124,58,237,0.12)", borderWidth: 1, borderColor: "rgba(124,58,237,0.3)",
+    backgroundColor: "rgba(30,58,138,0.12)", borderWidth: 1, borderColor: "rgba(30,58,138,0.3)",
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
-  sortTxt: { color: "#a78bfa", fontSize: 11, fontWeight: "700" },
+  sortTxt: { color: "#60a5fa", fontSize: 11, fontWeight: "700" },
   sortDropdown: {
     marginHorizontal: 16, marginBottom: 8,
-    backgroundColor: "#13122a", borderRadius: 12,
-    borderWidth: 1, borderColor: "#1e1b4b",
+    backgroundColor: "#071528", borderRadius: 12,
+    borderWidth: 1, borderColor: "#0f2557",
     overflow: "hidden",
   },
   sortOption: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, paddingVertical: 13,
-    borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    borderBottomWidth: 1, borderBottomColor: "#0f2557",
   },
   sortOptionTxt: { color: COLORS.textMuted, fontSize: 14 },
-  sortOptionActive: { color: "#a78bfa", fontWeight: "700" },
+  sortOptionActive: { color: "#60a5fa", fontWeight: "700" },
 
-  skeleton: { backgroundColor: "#13122a", borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: "#1e1b4b", overflow: "hidden" },
-  skeletonImg: { width: "100%", height: 180, backgroundColor: "#1e1b4b" },
-  skeletonLine: { height: 12, backgroundColor: "#1e1b4b", borderRadius: 6 },
+  skeleton: { backgroundColor: "#071528", borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: "#0f2557", overflow: "hidden" },
+  skeletonImg: { width: "100%", height: 180, backgroundColor: "#0f2557" },
+  skeletonLine: { height: 12, backgroundColor: "#0f2557", borderRadius: 6 },
 
   emptyState: { alignItems: "center", paddingVertical: 60, paddingHorizontal: 24 },
   emptyIcon: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: "rgba(124,58,237,0.15)", alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(30,58,138,0.15)", alignItems: "center", justifyContent: "center",
     marginBottom: 16,
   },
   emptyTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   emptySub: { color: COLORS.textMuted, fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 20 },
   emptyBtn: {
-    backgroundColor: "#7c3aed", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10,
+    backgroundColor: "#0c2461", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10,
   },
   emptyBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });
 
 const cardStyles = StyleSheet.create({
   card: {
-    backgroundColor: "#13122a", borderRadius: 18,
-    borderWidth: 1, borderColor: "#1e1b4b",
+    backgroundColor: "#071528", borderRadius: 18,
+    borderWidth: 1, borderColor: "#0f2557",
     marginBottom: 18, overflow: "hidden",
     shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10, elevation: 4,
   },
@@ -652,7 +663,7 @@ const cardStyles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
   },
   statusLive: { backgroundColor: "rgba(239,68,68,0.9)", borderWidth: 1, borderColor: "#ef4444" },
-  statusUpcoming: { backgroundColor: "rgba(124,58,237,0.88)", borderWidth: 1, borderColor: "#7c3aed" },
+  statusUpcoming: { backgroundColor: "rgba(30,58,138,0.88)", borderWidth: 1, borderColor: "#0c2461" },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
   statusTxt: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   tagRow: { position: "absolute", bottom: 12, left: 12, flexDirection: "row", gap: 6 },
@@ -663,7 +674,7 @@ const cardStyles = StyleSheet.create({
   title: { color: "#f3f4f6", fontSize: 16, fontWeight: "900", lineHeight: 22, marginBottom: 8 },
 
   educatorRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-  educatorTxt: { color: "#a78bfa", fontSize: 13, fontWeight: "600" },
+  educatorTxt: { color: "#60a5fa", fontSize: 13, fontWeight: "600" },
 
   metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", marginBottom: 8, gap: 6 },
   metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -673,7 +684,7 @@ const cardStyles = StyleSheet.create({
   startRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 12 },
   startTxt: { color: "#9ca3af", fontSize: 12 },
 
-  divider: { height: 1, backgroundColor: "#1e1b4b", marginBottom: 12 },
+  divider: { height: 1, backgroundColor: "#0f2557", marginBottom: 12 },
 
   priceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   price: { color: "#f3f4f6", fontSize: 18, fontWeight: "900" },
@@ -683,7 +694,7 @@ const cardStyles = StyleSheet.create({
   saveTxt: { color: "#34d399", fontSize: 10, fontWeight: "800" },
   enrollBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "#7c3aed", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: "#0c2461", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
   },
   enrollTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
 

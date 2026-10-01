@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+﻿import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   ActivityIndicator, Alert, Modal, RefreshControl,
@@ -189,7 +189,7 @@ export default function EducatorDashboardScreen() {
   }
 
   const stats = analytics ? [
-    { label: "Total Students", value: String(analytics.totalStudents), icon: "people-outline" as const, color: "#a78bfa" },
+    { label: "Total Students", value: String(analytics.totalStudents), icon: "people-outline" as const, color: "#FF6B8A" },
     { label: "Pending Income", value: fmt(pendingTotal), icon: "cash-outline" as const, color: "#4ade80" },
     { label: "Live Classes", value: String(analytics.totalLiveClasses), icon: "videocam-outline" as const, color: "#f59e0b" },
   ] : [];
@@ -271,7 +271,7 @@ export default function EducatorDashboardScreen() {
                 appsLoading ? <ActivityIndicator color={COLORS.primaryLight} style={{ marginTop: 30 }} /> :
                 myApps.length === 0 ? <EmptyBox icon="hand-left-outline" text="No 1:1 session applications yet." /> :
                 myApps.map(a => {
-                  const statusColor = a.status === "approved" ? "#22c55e" : a.status === "rejected" ? "#ef4444" : a.status === "trainer_proposed" ? "#f59e0b" : "#60a5fa";
+                  const statusColor = a.status === "approved" ? "#22c55e" : a.status === "rejected" ? "#ef4444" : a.status === "trainer_proposed" ? "#f59e0b" : "#FF6B8A";
                   return (
                     <View key={a._id} style={s.card}>
                       <View style={s.cardTopRow}>
@@ -326,8 +326,8 @@ export default function EducatorDashboardScreen() {
                   <View key={b._id} style={s.card}>
                     <View style={s.cardTopRow}>
                       <Text style={s.cardName}>{b.client.name}</Text>
-                      <View style={[s.statusPill, { backgroundColor: "#7c3aed22" }]}>
-                        <Text style={[s.statusPillTxt, { color: "#a78bfa" }]}>{b.status.replace(/_/g, " ")}</Text>
+                      <View style={[s.statusPill, { backgroundColor: "#FF1E5622" }]}>
+                        <Text style={[s.statusPillTxt, { color: "#FF6B8A" }]}>{b.status.replace(/_/g, " ")}</Text>
                       </View>
                     </View>
                     <Text style={s.cardMeta}>{b.client.email} · ₹{(b.amount / 100).toLocaleString("en-IN")}</Text>
@@ -390,7 +390,7 @@ export default function EducatorDashboardScreen() {
                     <Text style={s.earningsInfoTxt}>Sale price → 18% GST deducted → remaining split 50% to you + 50% to admin</Text>
                     <View style={{ flexDirection: "row", gap: 20, marginTop: 10 }}>
                       <View><Text style={s.earnLabel}>Pending</Text><Text style={[s.earnVal, { color: "#4ade80" }]}>{fmt(pendingTotal)}</Text></View>
-                      <View><Text style={s.earnLabel}>Received</Text><Text style={[s.earnVal, { color: "#60a5fa" }]}>{fmt(paidTotal)}</Text></View>
+                      <View><Text style={s.earnLabel}>Received</Text><Text style={[s.earnVal, { color: "#FF6B8A" }]}>{fmt(paidTotal)}</Text></View>
                     </View>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
@@ -479,7 +479,7 @@ const TrainerChatModal: React.FC<{ expert: { id: string; name: string; online: b
               const isMe = m.sender?._id === user?._id;
               return (
                 <View key={m._id} style={{ flexDirection: "row", justifyContent: isMe ? "flex-end" : "flex-start", marginBottom: 8 }}>
-                  <View style={[cm.bubble, { backgroundColor: isMe ? "#7c3aed" : COLORS.surface2 }]}>
+                  <View style={[cm.bubble, { backgroundColor: isMe ? "#FF1E56" : COLORS.surface2 }]}>
                     <Text style={{ color: "#fff", fontSize: 13 }}>{m.text}</Text>
                   </View>
                 </View>
@@ -488,7 +488,7 @@ const TrainerChatModal: React.FC<{ expert: { id: string; name: string; online: b
           </ScrollView>
           <View style={cm.inputRow}>
             <TextInput value={text} onChangeText={setText} placeholder="Type a reply…" placeholderTextColor={COLORS.textMuted} style={cm.input} />
-            <TouchableOpacity onPress={send} disabled={sending || !text.trim()} style={[cm.sendBtn, { backgroundColor: text.trim() ? "#7c3aed" : COLORS.border }]}>
+            <TouchableOpacity onPress={send} disabled={sending || !text.trim()} style={[cm.sendBtn, { backgroundColor: text.trim() ? "#FF1E56" : COLORS.border }]}>
               <Ionicons name="send" size={15} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -522,11 +522,11 @@ const s = StyleSheet.create({
   liveClassesTitle: { color: COLORS.text, fontWeight: "800", fontSize: 14, marginBottom: 8, marginTop: 4 },
   liveClassRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 12, marginBottom: 8 },
   liveClassTitle: { color: COLORS.text, fontWeight: "700", fontSize: 13 },
-  goLiveBtn: { backgroundColor: "#7c3aed", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  goLiveBtn: { backgroundColor: "#FF1E56", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   goLiveBtnTxt: { color: "#fff", fontWeight: "800", fontSize: 12 },
   tabRow: { paddingHorizontal: 16, paddingTop: 16, gap: 8 },
   tabChip: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-  tabChipActive: { backgroundColor: "#7c3aed", borderColor: "#7c3aed" },
+  tabChipActive: { backgroundColor: "#FF1E56", borderColor: "#FF1E56" },
   tabChipTxt: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700" },
   tabChipTxtActive: { color: "#fff" },
 
@@ -543,19 +543,19 @@ const s = StyleSheet.create({
   proposedNote: { color: "#f59e0b", fontSize: 12, backgroundColor: "rgba(245,158,11,0.08)", padding: 8, borderRadius: 8, marginTop: 4 },
 
   input: { borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 10, padding: 10, fontSize: 13, color: COLORS.text, backgroundColor: COLORS.bg, marginBottom: 8 },
-  primaryBtn: { backgroundColor: "#7c3aed", borderRadius: 10, paddingVertical: 11, alignItems: "center" },
+  primaryBtn: { backgroundColor: "#FF1E56", borderRadius: 10, paddingVertical: 11, alignItems: "center" },
   primaryBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
   ghostBtn: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11 },
   ghostBtnTxt: { color: COLORS.textMuted, fontWeight: "600", fontSize: 13 },
-  outlineBtn: { borderWidth: 1, borderColor: "#7c3aed", backgroundColor: "rgba(124,58,237,0.1)", borderRadius: 10, paddingVertical: 11, alignItems: "center", marginTop: 4 },
+  outlineBtn: { borderWidth: 1, borderColor: "#FF1E56", backgroundColor: "rgba(30,58,138,0.1)", borderRadius: 10, paddingVertical: 11, alignItems: "center", marginTop: 4 },
   outlineBtnTxt: { color: COLORS.primaryLight, fontWeight: "700", fontSize: 13 },
   durChip: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  durChipActive: { backgroundColor: "#7c3aed", borderColor: "#7c3aed" },
+  durChipActive: { backgroundColor: "#FF1E56", borderColor: "#FF1E56" },
   durChipTxt: { color: COLORS.textMuted, fontSize: 12 },
   durChipTxtActive: { color: "#fff" },
 
   convRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, padding: 14, marginBottom: 8 },
-  convAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#7c3aed", alignItems: "center", justifyContent: "center" },
+  convAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#FF1E56", alignItems: "center", justifyContent: "center" },
   convAvatarTxt: { color: "#fff", fontWeight: "800" },
   convName: { color: COLORS.text, fontWeight: "700", fontSize: 14 },
   convLast: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
@@ -577,7 +577,7 @@ const s = StyleSheet.create({
 const cm = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: { height: "75%", backgroundColor: COLORS.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: "hidden" },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, backgroundColor: "#6d28d9" },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, backgroundColor: "#FF1E56" },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
   headerAvatarTxt: { color: "#fff", fontWeight: "800" },
   headerName: { color: "#fff", fontWeight: "800", fontSize: 15 },

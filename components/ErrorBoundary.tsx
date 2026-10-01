@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 
 interface State { hasError: boolean; error: Error | null }
@@ -35,10 +35,10 @@ export default class ErrorBoundary extends React.Component<
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0914", alignItems: "center", justifyContent: "center", padding: 24 },
+  container: { flex: 1, backgroundColor: "#030c1a", alignItems: "center", justifyContent: "center", padding: 24 },
   title: { color: "#ef4444", fontSize: 20, fontWeight: "700", marginBottom: 16 },
-  box: { maxHeight: 300, backgroundColor: "#1e1b4b", borderRadius: 12, padding: 16, width: "100%", marginBottom: 24 },
+  box: { maxHeight: 300, backgroundColor: "#0f2557", borderRadius: 12, padding: 16, width: "100%", marginBottom: 24 },
   msg: { color: "#d1d5db", fontSize: 13, fontFamily: "monospace" },
-  btn: { backgroundColor: "#7c3aed", paddingHorizontal: 32, paddingVertical: 12, borderRadius: 10 },
+  btn: { backgroundColor: "#0c2461", paddingHorizontal: 32, paddingVertical: 12, borderRadius: 10 },
   btnTxt: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  Image, Alert, StyleSheet, Linking,
+  Alert, StyleSheet, Linking,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -36,7 +37,7 @@ const PROG_DATA: Record<string, {
       "Lifetime access to recordings",
       "Certificate of completion",
     ],
-    accentColor: "#6d28d9",
+    accentColor: "#0c2461",
     educator: "Geeta Makhijani",
     duration: "8-Week Full Program",
   },
@@ -52,7 +53,7 @@ const PROG_DATA: Record<string, {
       "Practice community access",
       "BSH Certified Practitioner badge",
     ],
-    accentColor: "#0d9488",
+    accentColor: "#0c2461",
     educator: "BSH Faculty",
     duration: "12-Week Certification",
   },
@@ -68,7 +69,7 @@ const PROG_DATA: Record<string, {
       "4-Day intensive workshop format",
       "Supervised practice sessions",
     ],
-    accentColor: "#1d4ed8",
+    accentColor: "#1e3a8a",
     educator: "Dr. Pradeep Kumar",
     duration: "4-Day Intensive",
   },
@@ -84,7 +85,7 @@ const PROG_DATA: Record<string, {
       "Past-life connection healing",
       "Practitioner-level certification",
     ],
-    accentColor: "#7c3aed",
+    accentColor: "#0c2461",
     educator: "BSH Faculty",
     duration: "6-Week Program",
   },
@@ -134,7 +135,7 @@ export default function ComingSoonScreen() {
     tagline: "Something Extraordinary is Coming",
     desc: "We are preparing something truly special. Be the first to know when it launches.",
     features: ["Exclusive early-bird pricing", "Lifetime access", "Certificate of completion"],
-    accentColor: "#7c3aed",
+    accentColor: "#0c2461",
     educator: "BSH Faculty",
     duration: "Full Program",
   };
@@ -160,7 +161,7 @@ export default function ComingSoonScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         {/* Hero */}
         <View style={s.heroWrap}>
-          <Image source={data.img} style={s.heroBg} resizeMode="cover" />
+          <Image source={data.img} style={s.heroBg} contentFit="cover" />
           <View style={s.heroOverlay} />
           <View style={s.heroBadgeRow}>
             <View style={[s.heroBadge, { backgroundColor: data.accentColor + "cc" }]}>
@@ -259,7 +260,7 @@ export default function ComingSoonScreen() {
           <Text style={s.ctaLabel}>Want a head start? Talk to our team.</Text>
           <TouchableOpacity style={s.consultBtn}
             onPress={() => router.push("/(tabs)/consultation" as any)}>
-            <Ionicons name="chatbubbles-outline" size={16} color="#7c3aed" style={{ marginRight: 8 }} />
+            <Ionicons name="chatbubbles-outline" size={16} color="#0c2461" style={{ marginRight: 8 }} />
             <Text style={s.consultBtnTxt}>Book a Free Consultation →</Text>
           </TouchableOpacity>
 
@@ -321,7 +322,7 @@ const s = StyleSheet.create({
   notifySub: { color: "#94a3b8", fontSize: 13, marginBottom: 18 },
   formBox: { gap: 12 },
   input: {
-    backgroundColor: "#1e1b4b", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13,
+    backgroundColor: "#0f2557", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13,
     color: "#fff", fontSize: 14, borderWidth: 1, borderColor: "#2d2a5e",
   },
   notifyBtn: { borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 4 },
@@ -338,10 +339,10 @@ const s = StyleSheet.create({
   ctaLabel: { color: "#94a3b8", fontSize: 13, textAlign: "center", marginBottom: 12 },
   consultBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
-    backgroundColor: "#1e1b4b", borderRadius: 12, paddingVertical: 13,
-    borderWidth: 1, borderColor: "#7c3aed44", marginBottom: 12,
+    backgroundColor: "#0f2557", borderRadius: 12, paddingVertical: 13,
+    borderWidth: 1, borderColor: "#0c246144", marginBottom: 12,
   },
-  consultBtnTxt: { color: "#7c3aed", fontSize: 14, fontWeight: "700" },
+  consultBtnTxt: { color: "#0c2461", fontSize: 14, fontWeight: "700" },
   whatsappBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     backgroundColor: "#0f2010", borderRadius: 12, paddingVertical: 13,

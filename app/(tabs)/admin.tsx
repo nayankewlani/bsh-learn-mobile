@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -68,7 +68,7 @@ const PERIODS: Period[] = ["1d", "2d", "1w", "1m", "3m", "6m", "1y"];
 const PERIOD_LABEL: Record<Period, string> = { "1d":"1D","2d":"2D","1w":"1W","1m":"1M","3m":"3M","6m":"6M","1y":"1Y" };
 
 const STATUS_COLOR: Record<string, string> = {
-  pending:"#f59e0b", contacted:"#60a5fa", scheduled:"#a78bfa", completed:"#4ade80", cancelled:"#ef4444",
+  pending:"#f59e0b", contacted:"#FF6B8A", scheduled:"#FF6B8A", completed:"#4ade80", cancelled:"#ef4444",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -274,7 +274,7 @@ export default function AdminScreen() {
     ?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "AD";
 
   // ── Extra content for Course Enrollments card ──
-  const enrollExtra = (() => {
+  const enrollExtra = useMemo(() => {
     const ce = analytics?.courseEnrollments;
     if (!ce?.topCourses?.length) return null;
     const max = Math.max(...ce.topCourses.map(c => c.count), 1);
@@ -292,10 +292,10 @@ export default function AdminScreen() {
         ))}
       </View>
     );
-  })();
+  }, [analytics?.courseEnrollments]);
 
   // ── Extra content for Live Classes card ──
-  const liveExtra = (() => {
+  const liveExtra = useMemo(() => {
     const lc = analytics?.liveClasses;
     if (!lc) return null;
     return (
@@ -324,11 +324,11 @@ export default function AdminScreen() {
                 <View style={{ alignItems: "flex-end", gap: 4 }}>
                   <Text style={styles.classAttendees}>👥 {c.attendees}</Text>
                   <View style={[styles.statusPill, {
-                    backgroundColor: c.status === "live" ? "#ef444422" : c.status === "scheduled" ? "#3b82f622" : "#64748b22",
-                    borderColor:     c.status === "live" ? "#ef444455" : c.status === "scheduled" ? "#3b82f655" : "#64748b55",
+                    backgroundColor: c.status === "live" ? "#ef444422" : c.status === "scheduled" ? "#FF1E5622" : "#64748b22",
+                    borderColor:     c.status === "live" ? "#ef444455" : c.status === "scheduled" ? "#FF1E5655" : "#64748b55",
                   }]}>
                     <Text style={[styles.statusText, {
-                      color: c.status === "live" ? "#ef4444" : c.status === "scheduled" ? "#3b82f6" : "#94a3b8",
+                      color: c.status === "live" ? "#ef4444" : c.status === "scheduled" ? "#FF1E56" : "#94a3b8",
                     }]}>{c.status}</Text>
                   </View>
                 </View>
@@ -338,7 +338,7 @@ export default function AdminScreen() {
         )}
       </View>
     );
-  })();
+  }, [analytics?.liveClasses]);
 
   if (loading) {
     return (
@@ -390,8 +390,8 @@ export default function AdminScreen() {
         {/* Stats Grid */}
         <Text style={styles.sectionTitle}>Overview</Text>
         <View style={styles.statsGrid}>
-          <StatCard icon="people"   label="Students"         value={stats?.totalStudents ?? 0}    color="#a78bfa" onPress={() => router.push("/admin/students")} />
-          <StatCard icon="mic"      label="Trainers"         value={stats?.totalTrainers ?? 0}    color="#60a5fa" onPress={() => router.push("/admin/trainers")} />
+          <StatCard icon="people"   label="Students"         value={stats?.totalStudents ?? 0}    color="#FF6B8A" onPress={() => router.push("/admin/students")} />
+          <StatCard icon="mic"      label="Trainers"         value={stats?.totalTrainers ?? 0}    color="#FF6B8A" onPress={() => router.push("/admin/trainers")} />
           <StatCard icon="book"     label="Courses"          value={stats?.publishedCourses ?? 0} color="#4ade80" sub={`${stats?.totalCourses ?? 0} total`} onPress={() => router.push("/admin/courses")} />
           <StatCard icon="calendar" label="Pending Sessions" value={stats?.pendingSessions ?? 0}  color="#f59e0b" onPress={() => router.push("/admin/sessions")} />
         </View>
@@ -404,7 +404,7 @@ export default function AdminScreen() {
             <Text style={styles.revenueLabel}>Total Revenue</Text>
           </View>
           <View style={[styles.revenueCard, { flex: 1 }]}>
-            <Ionicons name="stats-chart" size={20} color="#a78bfa" />
+            <Ionicons name="stats-chart" size={20} color="#FF6B8A" />
             <Text style={styles.revenueValue}>{fmt(stats?.thisMonthRevenuePaise ?? 0)}</Text>
             <Text style={styles.revenueLabel}>This Month</Text>
           </View>
@@ -415,7 +415,7 @@ export default function AdminScreen() {
         <Text style={styles.chartHint}>Tap any card to expand • period selector inside each card</Text>
 
         <ChartBlock
-          icon="👥" label="New Students" color="#3b82f6"
+          icon="👥" label="New Students" color="#FF1E56"
           series={analytics?.students} period={period}
           onPeriodChange={setPeriod} loading={aLoading}
         />
@@ -492,8 +492,8 @@ export default function AdminScreen() {
         <Text style={[styles.sectionTitle, { marginTop: 6 }]}>Quick Actions</Text>
         <View style={styles.quickGrid}>
           {([
-            { icon: "people-outline"   as IoniconName, label: "Students",    color: "#a78bfa", route: "/admin/students"     },
-            { icon: "mic-outline"      as IoniconName, label: "Trainers",     color: "#60a5fa", route: "/admin/trainers"     },
+            { icon: "people-outline"   as IoniconName, label: "Students",    color: "#FF6B8A", route: "/admin/students"     },
+            { icon: "mic-outline"      as IoniconName, label: "Trainers",     color: "#FF6B8A", route: "/admin/trainers"     },
             { icon: "book-outline"     as IoniconName, label: "Courses",      color: "#4ade80", route: "/admin/courses"      },
             { icon: "card-outline"     as IoniconName, label: "Transactions", color: "#f59e0b", route: "/admin/transactions" },
             { icon: "radio-outline"    as IoniconName, label: "Live Classes", color: "#ef4444", route: "/admin/live-classes" },
@@ -543,10 +543,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 18, paddingBottom: 14, paddingTop: 12,
-    backgroundColor: "#13122a", borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   headerTitle:     { color: COLORS.text, fontWeight: "900", fontSize: 20, letterSpacing: 0.5 },
-  headerSub:       { color: "#a78bfa", fontSize: 11, fontWeight: "600", marginTop: 1 },
+  headerSub:       { color: "#FF6B8A", fontSize: 11, fontWeight: "600", marginTop: 1 },
   headerRight:     { flexDirection: "row", alignItems: "center", gap: 10 },
   adminBadge:      {
     flexDirection: "row", alignItems: "center", gap: 4,
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   avatar:          {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: "#a78bfa44",
+    borderWidth: 2, borderColor: "#FF6B8A44",
   },
   avatarText:      { color: "#fff", fontWeight: "800", fontSize: 13 },
 
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
   liveStatLbl: { color: COLORS.textMuted, fontSize: 11, fontWeight: "600", marginTop: 2 },
 
   /* Class rows */
-  classRow:       { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "#1e1b4b" },
+  classRow:       { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "#F5F7FA" },
   className:      { color: COLORS.text, fontSize: 13, fontWeight: "600", marginBottom: 2 },
   classDate:      { color: COLORS.textMuted, fontSize: 11 },
   classAttendees: { color: "#94a3b8", fontSize: 11 },
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
   sessionName:  { color: COLORS.text, fontWeight: "700", fontSize: 15, marginBottom: 2 },
   sessionEmail: { color: COLORS.textMuted, fontSize: 12 },
   sessionPhone: { color: COLORS.textMuted, fontSize: 12, marginTop: 1 },
-  sessionType:  { color: "#a78bfa", fontSize: 12, fontWeight: "600", marginBottom: 4 },
+  sessionType:  { color: "#FF6B8A", fontSize: 12, fontWeight: "600", marginBottom: 4 },
   sessionDate:  { color: "#6b7280", fontSize: 11 },
   statusPill:   { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   statusText:   { fontSize: 11, fontWeight: "700" },

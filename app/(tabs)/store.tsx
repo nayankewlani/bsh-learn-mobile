@@ -1,8 +1,9 @@
-import React, { useRef, useState } from "react";
+﻿import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Dimensions, Alert, Animated, NativeSyntheticEvent, NativeScrollEvent,
+  Dimensions, Alert, Animated, NativeSyntheticEvent, NativeScrollEvent,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,7 +40,7 @@ const PRODUCTS = [
     title: "Art of Shadow Work",
     desc: "Deep inner healing — heal suppressed emotions permanently.",
     img: shadowWorkImg, price: 2499, originalPrice: 3999,
-    badge: "TOP RATED", badgeColor: "#7c3aed",
+    badge: "TOP RATED", badgeColor: "#0c2461",
     tag: "Digital Course",
     slug: "",
   },
@@ -84,7 +85,7 @@ const PRODUCTS = [
     title: "Past Life Regression Therapy",
     desc: "Journey into past lives to heal present-day blocks.",
     img: pastLifeImg, price: 2499, originalPrice: 3999,
-    badge: "POPULAR", badgeColor: "#7c3aed",
+    badge: "POPULAR", badgeColor: "#0c2461",
     tag: "Therapy Course",
     slug: "",
   },
@@ -102,7 +103,7 @@ const PRODUCTS = [
     title: "BSH Plus Membership",
     desc: "Access all 20 healing tools, guided meditations & live sessions.",
     img: bshLogoImg, price: 999, originalPrice: 1999,
-    badge: "MONTHLY", badgeColor: "#0d9488",
+    badge: "MONTHLY", badgeColor: "#0c2461",
     tag: "Subscription",
     slug: "",
   },
@@ -118,7 +119,7 @@ export default function StoreScreen() {
   const lastScrollYRef = useRef(0);
   const headerHiddenRef = useRef(false);
 
-  const handleMainScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleMainScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const delta = y - lastScrollYRef.current;
     lastScrollYRef.current = y;
@@ -136,13 +137,13 @@ export default function StoreScreen() {
       headerHiddenRef.current = false;
       Animated.timing(headerTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     }
-  };
+  }, []);
 
-  const filtered = activeCategory === "All"
+  const filtered = useMemo(() => activeCategory === "All"
     ? PRODUCTS
-    : PRODUCTS.filter(p => p.category === activeCategory);
+    : PRODUCTS.filter(p => p.category === activeCategory), [activeCategory]);
 
-  const handleBuy = (product: typeof PRODUCTS[0]) => {
+  const handleBuy = useCallback((product: typeof PRODUCTS[0]) => {
     if (!product.isActive) return;
     if (product.slug) { router.push(`/program/${product.slug}` as any); return; }
     Alert.alert(
@@ -153,14 +154,14 @@ export default function StoreScreen() {
         { text: "Cancel", style: "cancel" },
       ]
     );
-  };
+  }, []);
 
   return (
     <View style={styles.root}>
       {/* ── Floating Header (same as Home) ── */}
       <Animated.View style={[styles.headerWrapper, { paddingTop: insets.top, transform: [{ translateY: headerTranslateY }] }]}>
         <View style={styles.headerRow}>
-          <Image source={bshLogoImg} style={styles.headerLogo} resizeMode="contain" />
+          <Image source={bshLogoImg} style={styles.headerLogo} contentFit="contain" />
           <View style={styles.brandArea}>
             <Text style={styles.brandName}>BSH</Text>
             <Text style={styles.brandSub}>Store</Text>
@@ -175,7 +176,7 @@ export default function StoreScreen() {
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push(user ? "/(tabs)/dashboard" : "/(auth)/login")}>
               {user?.avatar ? (
-                <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                <Image source={{ uri: user.avatar }} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" />
               ) : (
                 <View style={styles.avatarDefault}>
                   <Text style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase() ?? "B"}</Text>
@@ -186,7 +187,7 @@ export default function StoreScreen() {
         </View>
         <TouchableOpacity style={styles.searchBar} activeOpacity={0.9}>
           <Ionicons name="search-outline" size={16} color="#9ca3af" />
-          <Text style={styles.searchPlaceholder}>Search for <Text style={{ color: "#7c3aed", fontWeight: "700" }}>courses</Text></Text>
+          <Text style={styles.searchPlaceholder}>Search for <Text style={{ color: "#0c2461", fontWeight: "700" }}>courses</Text></Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -244,7 +245,7 @@ export default function StoreScreen() {
             >
               {/* Image */}
               <View style={styles.cardImgWrapper}>
-                <Image source={product.img} style={[styles.cardImg, !active && { opacity: 0.45 }]} />
+                <Image source={product.img} style={[styles.cardImg, !active && { opacity: 0.45 }]} contentFit="cover" />
                 <View style={styles.cardImgDim} />
                 {active && product.badge && (
                   <View style={[styles.cardBadge, { backgroundColor: product.badgeColor }]}>
@@ -304,7 +305,7 @@ const styles = StyleSheet.create({
 
   // ── Floating header (mirrors Home) ───────────────────────────────────────
   headerWrapper: {
-    backgroundColor: "#2d0a6e",
+    backgroundColor: "#0f2557",
     paddingHorizontal: 16, paddingBottom: 14,
     position: "absolute", top: 0, left: 0, right: 0, zIndex: 100,
     elevation: 10,
@@ -340,14 +341,14 @@ const styles = StyleSheet.create({
 
   promoBanner: {
     marginHorizontal: 16, marginTop: 12, marginBottom: 4,
-    backgroundColor: "#2d0a6e",
+    backgroundColor: "#0f2557",
     borderRadius: 16, padding: 18,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     borderWidth: 1, borderColor: "#4c1d95",
   },
   promoLeft: { flex: 1 },
   promoTag: {
-    color: "#a78bfa", fontSize: 10, fontWeight: "800", letterSpacing: 1,
+    color: "#60a5fa", fontSize: 10, fontWeight: "800", letterSpacing: 1,
     marginBottom: 4,
   },
   promoTitle: { color: "#fff", fontSize: 22, fontWeight: "900", marginBottom: 2 },
@@ -357,11 +358,11 @@ const styles = StyleSheet.create({
   catScroll: { marginTop: 12, marginBottom: 4, flexGrow: 0 },
   catTab: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1.5, borderColor: "#3730a3",
+    borderWidth: 1.5, borderColor: "#0c2461",
   },
-  catTabActive: { backgroundColor: "rgba(124,58,237,0.18)", borderColor: "#7c3aed" },
+  catTabActive: { backgroundColor: "rgba(30,58,138,0.18)", borderColor: "#0c2461" },
   catTxt: { color: COLORS.textMuted, fontSize: 13, fontWeight: "600" },
-  catTxtActive: { color: "#c4b5fd" },
+  catTxtActive: { color: "#93c5fd" },
 
   grid: {
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24,
@@ -372,12 +373,12 @@ const styles = StyleSheet.create({
     width: (SW - 46) / 2,
     marginBottom: 14,
     marginRight: 14,
-    backgroundColor: "#13122a",
+    backgroundColor: "#071528",
     borderRadius: 16, overflow: "hidden",
-    borderWidth: 1, borderColor: "#1e1b4b",
+    borderWidth: 1, borderColor: "#0f2557",
   },
   cardImgWrapper: { height: 130, position: "relative" },
-  cardImg: { width: "100%", height: "100%", resizeMode: "cover" },
+  cardImg: { width: "100%", height: "100%" },
   cardImgDim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.25)" },
   cardBadge: {
     position: "absolute", top: 8, left: 8,
@@ -416,11 +417,11 @@ const styles = StyleSheet.create({
   },
   startingSoonBadge: {
     backgroundColor: "rgba(10,6,30,0.82)",
-    borderRadius: 8, borderWidth: 1, borderColor: "rgba(124,58,237,0.5)",
+    borderRadius: 8, borderWidth: 1, borderColor: "rgba(30,58,138,0.5)",
     paddingHorizontal: 12, paddingVertical: 7,
   },
   startingSoonTxt: {
-    color: "#a78bfa", fontSize: 10, fontWeight: "900",
+    color: "#60a5fa", fontSize: 10, fontWeight: "900",
     letterSpacing: 1.5,
   },
 });

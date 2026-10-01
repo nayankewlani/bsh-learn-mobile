@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
-import client from "../api/client";
+import client, { setMemoryToken } from "../api/client";
+import { saveRestoreCredential } from "../lib/restoreCredentials";
 
 export interface User {
   _id: string;
@@ -10,6 +11,7 @@ export interface User {
   role: "student" | "educator" | "admin";
   avatar?: string;
   bio?: string;
+  dob?: string;
 }
 
 interface AuthState {
@@ -20,6 +22,7 @@ interface AuthState {
   register: (name: string, email: string, password: string, role?: string, verificationId?: string) => Promise<void>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
+  updateProfile: (data: Partial<User & { dob?: string }>) => Promise<void>;
   clearError: () => void;
 }
 
@@ -43,7 +46,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data } = await client.post("/auth/login", { email, password });
       await SecureStore.setItemAsync("accessToken", data.accessToken);
       await SecureStore.setItemAsync("refreshToken", data.refreshToken);
+      setMemoryToken(data.accessToken);
       set({ user: data.user, isLoading: false });
+      saveRestoreCredential(data.accessToken);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message || "Login failed";
       set({ error: msg, isLoading: false });
@@ -57,7 +62,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data } = await client.post("/auth/register", { name, email, password, role, verificationId });
       await SecureStore.setItemAsync("accessToken", data.accessToken);
       await SecureStore.setItemAsync("refreshToken", data.refreshToken);
+      setMemoryToken(data.accessToken);
       set({ user: data.user, isLoading: false });
+      saveRestoreCredential(data.accessToken);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message || "Registration failed";
       set({ error: msg, isLoading: false });
@@ -67,9 +74,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     try { await client.post("/auth/logout"); } catch {}
+    setMemoryToken(null);
     await SecureStore.deleteItemAsync("accessToken");
     await SecureStore.deleteItemAsync("refreshToken");
     set({ user: null });
+  },
+
+  updateProfile: async (data) => {
+    const { data: res } = await client.put("/auth/profile", data);
+    set({ user: res.user });
   },
 
   clearError: () => set({ error: null }),

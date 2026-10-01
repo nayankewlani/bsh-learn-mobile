@@ -46,6 +46,9 @@ export function getEngine(appId: string): IRtcEngine {
   engine.initialize({ appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting });
   engine.enableVideo();
   engine.enableAudio();
+  // startPreview() is required on Android/iOS to render the local camera tile before
+  // (and after) joining — without it the RtcSurfaceView uid:0 shows a black frame.
+  engine.startPreview();
   initializedAppId = appId;
   return engine;
 }
@@ -100,8 +103,17 @@ export function destroyEngine() {
   activeHandler = null;
 }
 
-export function setMuted(muted: boolean) { engine?.muteLocalAudioStream(muted); }
-export function setVideoOff(off: boolean) { engine?.enableLocalVideo(!off); engine?.muteLocalVideoStream(off); }
+export function setMuted(muted: boolean) {
+  engine?.muteLocalAudioStream(muted);
+  // Keep published track state in sync — some SDK versions require this to actually
+  // stop the remote side from receiving audio when the user hits mute.
+  engine?.updateChannelMediaOptions({ publishMicrophoneTrack: !muted });
+}
+export function setVideoOff(off: boolean) {
+  engine?.enableLocalVideo(!off);
+  engine?.muteLocalVideoStream(off);
+  engine?.updateChannelMediaOptions({ publishCameraTrack: !off });
+}
 export function switchCamera() { engine?.switchCamera(); }
 
 /** Audience member promoted to co-host — start publishing camera/mic without leaving the channel. */

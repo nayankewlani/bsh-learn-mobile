@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "874776625026",
+    "project_id": "bsh-healers",
+    "storage_bucket": "bsh-healers.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:874776625026:android:0bbf67f564c9a042c9199b",
+        "android_client_info": {
+          "package_name": "com.bshlearn.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBq3j7MHCnE5_0su6ZporJ9J88pps5WxKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

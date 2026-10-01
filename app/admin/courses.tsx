@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Alert, Switch, ScrollView, TextInput, Linking,
@@ -117,7 +117,7 @@ export default function AdminCoursesScreen() {
         <View style={{flexDirection:"row",alignItems:"flex-start",gap:10,marginBottom:10}}>
           <View style={{flex:1}}>
             <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
-            <Text style={{color:"#a78bfa",fontSize:12,marginBottom:2}}>{item.educator?.name || "—"}</Text>
+            <Text style={{color:"#FF6B8A",fontSize:12,marginBottom:2}}>{item.educator?.name || "—"}</Text>
             <View style={{flexDirection:"row",gap:6,flexWrap:"wrap",marginTop:4}}>
               <Text style={s.priceTag}>
                 {item.discountPrice&&item.discountPrice>0
@@ -170,7 +170,7 @@ export default function AdminCoursesScreen() {
               onPress={()=>generateRzpLink(item._id,"course")}
               disabled={toggling===item._id+"rzp"}>
               {toggling===item._id+"rzp"
-                ? <ActivityIndicator size="small" color="#a78bfa" />
+                ? <ActivityIndicator size="small" color="#FF6B8A" />
                 : <Text style={s.actionBtnTxt}>⚡ Gen Razorpay Link</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={s.actionBtn}
@@ -192,7 +192,7 @@ export default function AdminCoursesScreen() {
             label="Published" value={item.isPublished}
             loading={toggling===item._id+"isPublished"}
             onChange={()=>toggleCourse(item._id,"isPublished",item.isPublished)}
-            color="#7c3aed"
+            color="#FF1E56"
           />
           <ToggleItem
             label="Featured" value={item.isFeatured}
@@ -214,7 +214,7 @@ export default function AdminCoursesScreen() {
         <View style={{flexDirection:"row",alignItems:"flex-start",gap:10,marginBottom:10}}>
           <View style={{flex:1}}>
             <Text style={s.cardTitle}>{item.title}</Text>
-            <Text style={{color:"#60a5fa",fontSize:11,marginBottom:4}}>ID: {item.programId}</Text>
+            <Text style={{color:"#FF6B8A",fontSize:11,marginBottom:4}}>ID: {item.programId}</Text>
             <Text style={s.priceTag}>
               {item.discountPrice&&item.discountPrice>0
                 ? `₹${Math.round(item.discountPrice/100).toLocaleString("en-IN")} (disc)`
@@ -261,7 +261,7 @@ export default function AdminCoursesScreen() {
               onPress={()=>generateRzpLink(item._id,"program")}
               disabled={toggling===item._id+"rzp"}>
               {toggling===item._id+"rzp"
-                ? <ActivityIndicator size="small" color="#a78bfa" />
+                ? <ActivityIndicator size="small" color="#FF6B8A" />
                 : <Text style={s.actionBtnTxt}>⚡ Gen Razorpay Link</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={s.actionBtn}
@@ -367,34 +367,34 @@ const s = StyleSheet.create({
   center: { flex:1, alignItems:"center", justifyContent:"center", paddingTop:60 },
   list:   { padding:14, paddingBottom:60 },
 
-  infoBanner: { backgroundColor:"#1e1b4b", padding:10, paddingHorizontal:14, borderBottomWidth:1, borderBottomColor:"#3730a3" },
-  infoBannerTxt: { color:"#a78bfa", fontSize:11, fontWeight:"600", textAlign:"center" },
+  infoBanner: { backgroundColor:"#F5F7FA", padding:10, paddingHorizontal:14, borderBottomWidth:1, borderBottomColor:"#FF1E56" },
+  infoBannerTxt: { color:"#FF6B8A", fontSize:11, fontWeight:"600", textAlign:"center" },
 
-  tabRow:       { flexDirection:"row", paddingHorizontal:12, paddingVertical:10, gap:8, backgroundColor:"#13122a", borderBottomWidth:1, borderBottomColor:"#1e1b4b" },
-  tabBtn:       { flex:1, alignItems:"center", paddingVertical:8, borderRadius:12, backgroundColor:"#1e1b4b", borderWidth:1, borderColor:"#3730a3" },
+  tabRow:       { flexDirection:"row", paddingHorizontal:12, paddingVertical:10, gap:8, backgroundColor:"#FFFFFF", borderBottomWidth:1, borderBottomColor:"#F5F7FA" },
+  tabBtn:       { flex:1, alignItems:"center", paddingVertical:8, borderRadius:12, backgroundColor:"#F5F7FA", borderWidth:1, borderColor:"#FF1E56" },
   tabBtnActive: { backgroundColor:COLORS.primary, borderColor:COLORS.primary },
   tabBtnTxt:    { color:COLORS.textMuted, fontSize:13, fontWeight:"700" },
   tabBtnTxtActive: { color:"#fff" },
 
-  card: { backgroundColor:"#13122a", borderRadius:14, padding:14, borderWidth:1, borderColor:"#1e1b4b", marginBottom:10 },
+  card: { backgroundColor:"#FFFFFF", borderRadius:14, padding:14, borderWidth:1, borderColor:"#F5F7FA", marginBottom:10 },
   cardTitle: { color:COLORS.text, fontWeight:"800", fontSize:14, marginBottom:3, lineHeight:20 },
   priceTag: { color:"#4ade80", fontSize:12, fontWeight:"700" },
   metaTag: { color:"#6b7280", fontSize:11 },
 
   integRow: { flexDirection:"row", alignItems:"center", gap:12, marginBottom:8, flexWrap:"wrap" },
 
-  rzpInput: { backgroundColor:"#1e1b4b", borderRadius:10, paddingHorizontal:12, paddingVertical:10,
-    color:"#fff", fontSize:12, borderWidth:1, borderColor:"#3730a3" },
+  rzpInput: { backgroundColor:"#F5F7FA", borderRadius:10, paddingHorizontal:12, paddingVertical:10,
+    color:"#fff", fontSize:12, borderWidth:1, borderColor:"#FF1E56" },
 
   actionBtn: { flexDirection:"row", alignItems:"center", paddingHorizontal:10, paddingVertical:6,
-    borderRadius:8, borderWidth:1, borderColor:"#3730a3", backgroundColor:"#1e1b4b" },
-  actionBtnTxt: { color:"#a78bfa", fontSize:11, fontWeight:"700" },
+    borderRadius:8, borderWidth:1, borderColor:"#FF1E56", backgroundColor:"#F5F7FA" },
+  actionBtnTxt: { color:"#FF6B8A", fontSize:11, fontWeight:"700" },
 
   liveBadge:  { backgroundColor:"#4ade8022", borderRadius:8, paddingHorizontal:8, paddingVertical:3, borderWidth:1, borderColor:"#4ade8044" },
   liveBadgeTxt: { color:"#4ade80", fontSize:10, fontWeight:"700" },
   featBadge:  { backgroundColor:"#f59e0b22", borderRadius:8, paddingHorizontal:8, paddingVertical:3, borderWidth:1, borderColor:"#f59e0b44" },
   featBadgeTxt: { color:"#f59e0b", fontSize:10, fontWeight:"700" },
 
-  toggleRow: { flexDirection:"row", borderTopWidth:1, borderTopColor:"#1e1b4b", paddingTop:10, gap:0, marginTop:8 },
+  toggleRow: { flexDirection:"row", borderTopWidth:1, borderTopColor:"#F5F7FA", paddingTop:10, gap:0, marginTop:8 },
   emptyText: { color:COLORS.textMuted, marginTop:12, fontSize:14 },
 });

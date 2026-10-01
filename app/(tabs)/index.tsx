@@ -14,6 +14,7 @@ import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
 import { RAZORPAY_KEY_ID, API_URL } from "../../constants";
 import client from "../../api/client";
 import { blockIOSPurchase } from "../../lib/paymentGate";
+import { purchaseCourse, purchaseProgram } from "../../services/purchaseService";
 import { useHomeStore } from "../../stores/homeStore";
 
 // react-native-razorpay (EAS build only)
@@ -874,31 +875,20 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
-    if (blockIOSPurchase()) return;
-    if (!RazorpayCheckout) {
-      Alert.alert("Payment Not Available","Payments require the full BSH app build."); return;
-    }
     if (healPayLoading) return;
     setHealPayLoading(true);
     try {
-      const { data } = await client.post("/payments/create-order", { type:"program", programId:"healing-tools" });
-      const order = data.order;
-      const paymentData = await RazorpayCheckout.open({
-        key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
-        name:"BSH", description:"Healing Tools — Lifetime Access",
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
+      const result = await purchaseProgram({
+        programId: "healing-tools",
+        title: "Healing Tools — Lifetime Access",
+        pricePaise: 9900,
+        userName: user.name,
+        userEmail: user.email,
       });
-      await client.post("/payments/verify", {
-        razorpayOrderId:paymentData.razorpay_order_id,
-        razorpayPaymentId:paymentData.razorpay_payment_id,
-        razorpaySignature:paymentData.razorpay_signature,
-      });
-      setHasHealingAccess(true);
-      Alert.alert("Unlocked! 🎉","All 20 Healing Tools are now available for you.");
-    } catch (err: unknown) {
-      const e = err as { code?:number; description?:string; response?:{status?:number;data?:{message?:string}};message?:string };
-      if (e?.code===0) return;
-      Alert.alert("Payment Failed", e.response?.data?.message ?? e.description ?? e.message ?? "Payment failed. Please try again.");
+      if (result.success) {
+        setHasHealingAccess(true);
+        Alert.alert("Unlocked! 🎉","All 20 Healing Tools are now available for you.");
+      }
     } finally { setHealPayLoading(false); }
   };
 
@@ -1023,35 +1013,19 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
-    if (blockIOSPurchase()) return;
-    // If admin set a Razorpay payment link, open it directly
-    const directLink = (prog as any).razorpayPaymentLink;
-    if (directLink) { Linking.openURL(directLink).catch(()=>{}); setProgModal(null); return; }
-    if (!RazorpayCheckout) {
-      Alert.alert("Payment Not Available","Payments require the full BSH app build. Please use our website to purchase.");
-      return;
-    }
     setPurchaseLoading(true);
     try {
-      const { data } = await client.post("/payments/create-order", { type:"program", programId:prog.programId });
-      const order = data.order;
-      const paymentData = await RazorpayCheckout.open({
-        key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
-        name:"BSH Healers", description:prog.title,
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
+      const result = await purchaseProgram({
+        programId: prog.programId, title: prog.title,
+        pricePaise: prog.price, discountPricePaise: prog.discountPrice,
+        razorpayPaymentLink: (prog as any).razorpayPaymentLink,
+        userName: user.name, userEmail: user.email,
       });
-      await client.post("/payments/verify", {
-        razorpayOrderId:paymentData.razorpay_order_id,
-        razorpayPaymentId:paymentData.razorpay_payment_id,
-        razorpaySignature:paymentData.razorpay_signature,
-      });
-      setProgModal(null);
-      Alert.alert("Enrolled! 🎉",`Welcome to ${prog.title}! You now have full access.`,
-        [{ text:"Start Learning", onPress:()=>router.push("/(tabs)/explore") }]);
-    } catch (err: unknown) {
-      const e = err as { code?:number; description?:string; response?:{status?:number;data?:{message?:string}};message?:string };
-      if (e?.code===0) return;
-      Alert.alert("Payment Failed", e.response?.data?.message ?? e.description ?? e.message ?? "Payment failed.");
+      if (result.success) {
+        setProgModal(null);
+        Alert.alert("Enrolled! 🎉",`Welcome to ${prog.title}! You now have full access.`,
+          [{ text:"Start Learning", onPress:()=>router.push("/(tabs)/explore") }]);
+      }
     } finally { setPurchaseLoading(false); }
   };
 
@@ -1061,36 +1035,19 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
-    if (blockIOSPurchase()) return;
-    if (course.razorpayPaymentLink) {
-      Linking.openURL(course.razorpayPaymentLink).catch(()=>{});
-      setBatchModal(null); return;
-    }
-    if (!RazorpayCheckout) {
-      Alert.alert("Payment Not Available","Payments require the full BSH app build. Please use our website to purchase.");
-      return;
-    }
     setPurchaseLoading(true);
     try {
-      const { data } = await client.post("/payments/create-order", { type:"course", courseId:course._id });
-      const order = data.order;
-      const paymentData = await RazorpayCheckout.open({
-        key:RAZORPAY_KEY_ID, amount:String(order.amount), currency:"INR",
-        name:"BSH Healers", description:course.title,
-        order_id:order.id, prefill:{ name:user.name, email:user.email }, theme:{ color:"#0c2461" },
+      const result = await purchaseCourse({
+        courseId: course._id, title: course.title,
+        priceRupees: course.price, discountPriceRupees: course.discountPrice,
+        razorpayPaymentLink: course.razorpayPaymentLink,
+        userName: user.name, userEmail: user.email,
       });
-      await client.post("/payments/verify", {
-        razorpayOrderId:paymentData.razorpay_order_id,
-        razorpayPaymentId:paymentData.razorpay_payment_id,
-        razorpaySignature:paymentData.razorpay_signature,
-      });
-      setBatchModal(null);
-      Alert.alert("Enrolled! 🎉",`You're now enrolled in ${course.title}!`,
-        [{ text:"Go to Course", onPress:()=>router.push(`/course/${course._id}` as any) }]);
-    } catch (err: unknown) {
-      const e = err as { code?:number; description?:string; response?:{status?:number;data?:{message?:string}};message?:string };
-      if (e?.code===0) return;
-      Alert.alert("Payment Failed", e.response?.data?.message ?? e.description ?? e.message ?? "Payment failed.");
+      if (result.success) {
+        setBatchModal(null);
+        Alert.alert("Enrolled! 🎉",`You're now enrolled in ${course.title}!`,
+          [{ text:"Go to Course", onPress:()=>router.push(`/course/${course._id}` as any) }]);
+      }
     } finally { setPurchaseLoading(false); }
   };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Alert,
@@ -26,7 +26,7 @@ const STATUS_FILTERS = [
 ];
 const STATUS_COLOR: Record<string, string> = {
   live:      "#ef4444",
-  scheduled: "#a78bfa",
+  scheduled: "#FF6B8A",
   ended:     "#6b7280",
 };
 
@@ -134,20 +134,20 @@ const styles = StyleSheet.create({
   list:    { padding: 16, paddingBottom: 56 },
   filterRow: {
     flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10, gap: 8,
-    backgroundColor: "#13122a", borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
     flexWrap: "wrap",
   },
-  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#1e1b4b", borderWidth: 1, borderColor: "#3730a3" },
+  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#F5F7FA", borderWidth: 1, borderColor: "#FF1E56" },
   chipActive:     { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   chipText:       { color: COLORS.textMuted, fontSize: 12, fontWeight: "600" },
   chipTextActive: { color: "#fff" },
   card: {
-    backgroundColor: "#13122a", borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: "#1e1b4b", marginBottom: 8,
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: "#F5F7FA", marginBottom: 8,
   },
   cardTop:    { flexDirection: "row", alignItems: "flex-start" },
   title:      { color: COLORS.text, fontWeight: "700", fontSize: 14, marginBottom: 4, lineHeight: 20 },
-  educator:   { color: "#a78bfa", fontSize: 12, marginBottom: 3 },
+  educator:   { color: "#FF6B8A", fontSize: 12, marginBottom: 3 },
   time:       { color: "#6b7280", fontSize: 11 },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 5 },
   liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#ef4444" },

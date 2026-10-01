@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, StyleSheet,
   ActivityIndicator, RefreshControl, Alert,
@@ -56,11 +56,11 @@ export default function AdminTransactionsScreen() {
   const renderItem = ({ item }: { item: Transaction }) => (
     <View style={styles.card}>
       <View style={styles.row}>
-        <View style={[styles.iconBox, { backgroundColor: item.type === "course" ? "#7c3aed22" : "#f59e0b22" }]}>
+        <View style={[styles.iconBox, { backgroundColor: item.type === "course" ? "#FF1E5622" : "#f59e0b22" }]}>
           <Ionicons
             name={item.type === "course" ? "book" : "card"}
             size={18}
-            color={item.type === "course" ? "#a78bfa" : "#f59e0b"}
+            color={item.type === "course" ? "#FF6B8A" : "#f59e0b"}
           />
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
@@ -132,13 +132,13 @@ const styles = StyleSheet.create({
   list:    { padding: 16, paddingBottom: 56 },
   summary: {
     flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: "#13122a", borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   summaryText:  { color: "#4ade80", fontWeight: "700", fontSize: 14, flex: 1 },
   summaryCount: { color: COLORS.textMuted, fontSize: 12 },
   card: {
-    backgroundColor: "#13122a", borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: "#1e1b4b", marginBottom: 8,
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: "#F5F7FA", marginBottom: 8,
   },
   row:        { flexDirection: "row", alignItems: "center" },
   iconBox:    { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },

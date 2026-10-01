@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+﻿import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput,
   ActivityIndicator, Alert, Modal, BackHandler, Animated, Dimensions,
@@ -87,6 +87,10 @@ export default function LiveRoomScreen() {
   const [isVideoOff, setIsVideoOffState] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [networkQuality, setNetworkQuality] = useState(0);
+  // null = default layout (first remote is main, self is small); "local" or a
+  // specific uid = that participant has been pinned to the main tile by this
+  // viewer only — never synced to the backend or the other participants.
+  const [mainId, setMainId] = useState<number | "local" | null>(null);
 
   // Panel / polling state
   const [activePanel, setActivePanel] = useState<Panel>(null);
@@ -124,8 +128,9 @@ export default function LiveRoomScreen() {
   const [isForceMuted, setIsForceMuted] = useState(false);
   const [recordingActive, setRecordingActive] = useState(false);
   const [recordingBusy, setRecordingBusy] = useState(false);
+  const [ending, setEnding] = useState(false);
 
-  const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const msgCountRef   = useRef(0);
   const panelRef      = useRef<Panel>(null);
   const coHostRef     = useRef(false);
@@ -135,10 +140,17 @@ export default function LiveRoomScreen() {
 
   useEffect(() => { panelRef.current = activePanel; }, [activePanel]);
 
+  // If the pinned participant leaves the call, fall back to the default layout
+  // instead of leaving the main tile pointed at a uid that no longer exists.
+  useEffect(() => {
+    if (mainId !== null && mainId !== "local" && !remoteUids.includes(mainId)) setMainId(null);
+  }, [remoteUids, mainId]);
+
   /* ── initial connect ──────────────────────────────────────────────────── */
   useEffect(() => {
     let cancelled = false;
-    let waitRoomPoll: ReturnType<typeof setInterval> | null = null;
+    let waitRoomPoll: ReturnType<typeof setTimeout> | null = null;
+    let joinTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const connectAgora = (conn: any, myRole: Role) => {
       mainChannelRef.current = { channel: conn.channel, token: conn.token, uid: conn.uid ?? 0 };
@@ -154,13 +166,24 @@ export default function LiveRoomScreen() {
 
       getEngine(conn.appId);
       attachHandlers({
-        onJoined: (uid) => { setLocalUid(uid); setPhase("joined"); },
+        onJoined: (uid) => {
+          if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+          setLocalUid(uid); setPhase("joined");
+        },
         onUserJoined: (uid) => setRemoteUids(prev => prev.includes(uid) ? prev : [...prev, uid]),
         onUserOffline: (uid) => setRemoteUids(prev => prev.filter(u => u !== uid)),
         onNetworkQuality: (q) => setNetworkQuality(q),
         onError: (msg) => { if (cancelled) return; setErrorMsg(msg); setPhase("error"); },
       });
       joinChannel(conn.channel, conn.token, agoraRole, conn.uid ?? 0);
+
+      // Safety net: if Agora never fires onJoined, show an actionable error instead of
+      // leaving the user stuck on "Joining live class…" indefinitely.
+      joinTimeoutId = setTimeout(() => {
+        if (cancelled) return;
+        setErrorMsg("Could not connect to video — check your internet connection and try again.");
+        setPhase("error");
+      }, 30_000);
     };
 
     (async () => {
@@ -186,19 +209,23 @@ export default function LiveRoomScreen() {
 
         if (conn.waiting) {
           setPhase("waiting-room");
-          waitRoomPoll = setInterval(async () => {
+          const pollWaitRoom = async () => {
+            if (cancelled) return;
             try {
               const { data: st } = await client.get(`/live-classes/${classId}/state`);
               if (cancelled) return;
+              if (st.status === 'ended') { setErrorMsg("The class has ended."); setPhase("error"); return; }
               if (st.amIAdmitted) {
-                if (waitRoomPoll) clearInterval(waitRoomPoll);
                 const { data: conn2 } = await client.post(`/live-classes/${classId}/join`);
                 if (cancelled) return;
                 setPhase("connecting");
                 connectAgora(conn2, myRole);
+                return;
               }
             } catch {}
-          }, 3000);
+            if (!cancelled) waitRoomPoll = setTimeout(pollWaitRoom, 2000);
+          };
+          waitRoomPoll = setTimeout(pollWaitRoom, 2000);
           return;
         }
 
@@ -211,8 +238,9 @@ export default function LiveRoomScreen() {
     })();
     return () => {
       cancelled = true;
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (waitRoomPoll) clearInterval(waitRoomPoll);
+      if (pollRef.current) clearTimeout(pollRef.current);
+      if (waitRoomPoll) clearTimeout(waitRoomPoll);
+      if (joinTimeoutId) clearTimeout(joinTimeoutId);
       destroyEngine();
     };
   }, [classId]);
@@ -228,7 +256,16 @@ export default function LiveRoomScreen() {
   const pollState = useCallback(async () => {
     await flushStrokes();
     try {
-      const { data } = await client.get(`/live-classes/${classId}/state`);
+      const boardParam = panelRef.current === "whiteboard" ? "?board=1" : "";
+      const { data } = await client.get(`/live-classes/${classId}/state${boardParam}`);
+
+      // Class was ended by the host — kick all participants out immediately.
+      if (data.status === 'ended') {
+        destroyEngine();
+        router.back();
+        return;
+      }
+
       setRaisedHands(data.raisedHands || []);
       setCoHosts(data.coHosts || []);
       if (typeof data.hostUid === "number") setHostUid(data.hostUid);
@@ -246,7 +283,8 @@ export default function LiveRoomScreen() {
       setBreakoutRooms(data.breakoutRooms || []);
       setBreakoutActive(data.breakoutActive || false);
       setMyBreakout(data.myBreakout || null);
-      setWbStrokes(data.whiteboardStrokes || []);
+      // Only update strokes when the server included them (board panel open)
+      if (data.whiteboardStrokes != null) setWbStrokes(data.whiteboardStrokes);
 
       const myCoHost = (data.coHosts || []).find((c: CoHost) => c.user === String(user?._id) && c.token);
       const promoted = !!myCoHost;
@@ -266,11 +304,24 @@ export default function LiveRoomScreen() {
       }
 
       const incoming: ChatMsg[] = data.messages || [];
-      if (incoming.length > msgCountRef.current && panelRef.current !== "chat") {
-        setUnreadChat(u => u + (incoming.length - msgCountRef.current));
-      }
-      msgCountRef.current = incoming.length;
-      setMessages(incoming);
+      // Server now returns only the last 20 messages; merge with local history so
+      // messages from earlier in the session aren't lost on the client side.
+      setMessages(prev => {
+        if (incoming.length === 0) return prev;
+        const existingIds = new Set(prev.map((m, i) => `${m.user}:${m.text}:${i}`));
+        const merged = [...prev];
+        incoming.forEach((m, i) => {
+          const key = `${m.user}:${m.text}:${i}`;
+          if (!existingIds.has(key)) merged.push(m);
+        });
+        // Keep last 200 messages locally
+        const trimmed = merged.slice(-200);
+        if (trimmed.length > msgCountRef.current && panelRef.current !== "chat") {
+          setUnreadChat(u => u + (trimmed.length - msgCountRef.current));
+        }
+        msgCountRef.current = trimmed.length;
+        return trimmed;
+      });
 
       setLocked(!!data.locked);
       setWaitingRoomEnabled(!!data.waitingRoomEnabled);
@@ -287,9 +338,24 @@ export default function LiveRoomScreen() {
 
   useEffect(() => {
     if (phase !== "joined") return;
-    pollState();
-    pollRef.current = setInterval(pollState, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    let stopped = false;
+
+    const runPoll = async () => {
+      if (stopped) return;
+      await pollState();  // wait for the request to finish before scheduling the next
+      if (!stopped) {
+        // 2-second gap after the previous response — server cache is 1.5 s so
+        // back-to-back polls still hit the cache; max latency for any state change
+        // is now ~2 s instead of ~5 s.
+        pollRef.current = setTimeout(runPoll, 2000);
+      }
+    };
+
+    runPoll();
+    return () => {
+      stopped = true;
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
   }, [phase, pollState]);
 
   /* ── breakout join / return ──────────────────────────────────────────── */
@@ -346,8 +412,11 @@ export default function LiveRoomScreen() {
   const muteAll = async () => {
     if (coHosts.length === 0) return;
     setMutingAll(true);
-    try { await client.post(`/live-classes/${classId}/mute-all`); await pollState(); }
-    catch { Alert.alert("Error", "Could not mute all participants."); }
+    // Optimistic: add all co-hosts to muted list immediately
+    const coHostIds = coHosts.map(c => c.user);
+    setMutedUserIds(prev => [...new Set([...prev, ...coHostIds])]);
+    try { await client.post(`/live-classes/${classId}/mute-all`); }
+    catch { Alert.alert("Error", "Could not mute all participants."); await pollState(); }
     finally { setMutingAll(false); }
   };
 
@@ -390,14 +459,16 @@ export default function LiveRoomScreen() {
   };
   const admitFromWaitingRoom = async (userId: string) => {
     setAdmittingIds(ids => [...ids, userId]);
-    try { await client.post(`/live-classes/${classId}/waiting-room/${userId}/admit`); await pollState(); }
-    catch { Alert.alert("Error", "Could not admit this participant."); }
+    setWaitingList(p => p.filter(w => w.user !== userId)); // optimistic
+    try { await client.post(`/live-classes/${classId}/waiting-room/${userId}/admit`); }
+    catch { Alert.alert("Error", "Could not admit this participant."); await pollState(); }
     finally { setAdmittingIds(ids => ids.filter(i => i !== userId)); }
   };
   const denyFromWaitingRoom = async (userId: string) => {
     setAdmittingIds(ids => [...ids, userId]);
-    try { await client.post(`/live-classes/${classId}/waiting-room/${userId}/deny`); await pollState(); }
-    catch { Alert.alert("Error", "Could not deny this participant."); }
+    setWaitingList(p => p.filter(w => w.user !== userId)); // optimistic
+    try { await client.post(`/live-classes/${classId}/waiting-room/${userId}/deny`); }
+    catch { Alert.alert("Error", "Could not deny this participant."); await pollState(); }
     finally { setAdmittingIds(ids => ids.filter(i => i !== userId)); }
   };
 
@@ -405,20 +476,59 @@ export default function LiveRoomScreen() {
     const text = chatInput.trim();
     if (!text) return;
     setChatInput("");
-    try { await client.post(`/live-classes/${classId}/chat`, { text }); await pollState(); } catch {}
+    // Optimistic: show the message immediately, no need to wait for the server round-trip.
+    const optimistic: ChatMsg = { user: String(user?._id), name: user?.name || "You", text, createdAt: new Date().toISOString() };
+    setMessages(prev => {
+      const next = [...prev, optimistic].slice(-200);
+      msgCountRef.current = next.length;
+      return next;
+    });
+    try { await client.post(`/live-classes/${classId}/chat`, { text }); } catch {}
   };
 
   const toggleHand = async () => {
-    try { const { data } = await client.post(`/live-classes/${classId}/hand`); setIsHandRaised(data.raised); } catch {}
+    const next = !isHandRaised;
+    setIsHandRaised(next); // optimistic
+    try { await client.post(`/live-classes/${classId}/hand`); } catch { setIsHandRaised(!next); }
   };
 
-  const promoteUser = async (userId: string) => { try { await client.post(`/live-classes/${classId}/promote/${userId}`); await pollState(); } catch {} };
-  const demoteUser  = async (userId: string) => { try { await client.delete(`/live-classes/${classId}/promote/${userId}`); await pollState(); } catch {} };
-  const lowerHand   = async (userId: string) => { try { await client.delete(`/live-classes/${classId}/hand/${userId}`); setRaisedHands(p => p.filter(h => h.user !== userId)); } catch {} };
-  const muteUser    = async (userId: string) => { try { await client.post(`/live-classes/${classId}/mute/${userId}`); await pollState(); } catch {} };
-  const clearBoard  = async () => { try { await client.delete(`/live-classes/${classId}/whiteboard`); setWbStrokes([]); } catch {} };
-  const createBreakout = async () => { try { await client.post(`/live-classes/${classId}/breakout`, { count: breakoutCount }); await pollState(); } catch {} };
-  const endBreakout = async () => { try { await client.delete(`/live-classes/${classId}/breakout`); await pollState(); } catch {} };
+  const promoteUser = async (userId: string) => {
+    // Optimistic: move from raisedHands to coHosts immediately
+    const promoted = raisedHands.find(h => h.user === userId);
+    if (promoted) {
+      setRaisedHands(p => p.filter(h => h.user !== userId));
+      setCoHosts(p => [...p, { user: userId, name: promoted.name, token: "" }]);
+    }
+    try { await client.post(`/live-classes/${classId}/promote/${userId}`); } catch { await pollState(); }
+  };
+  const demoteUser  = async (userId: string) => {
+    setCoHosts(p => p.filter(c => c.user !== userId)); // optimistic
+    try { await client.delete(`/live-classes/${classId}/promote/${userId}`); } catch { await pollState(); }
+  };
+  const lowerHand   = async (userId: string) => {
+    setRaisedHands(p => p.filter(h => h.user !== userId)); // optimistic
+    try { await client.delete(`/live-classes/${classId}/hand/${userId}`); } catch {}
+  };
+  const muteUser    = async (userId: string) => {
+    const wasInList = mutedUserIds.includes(userId);
+    setMutedUserIds(p => wasInList ? p.filter(id => id !== userId) : [...p, userId]); // optimistic
+    try { await client.post(`/live-classes/${classId}/mute/${userId}`); } catch { await pollState(); }
+  };
+  const clearBoard  = async () => {
+    setWbStrokes([]); // optimistic
+    try { await client.delete(`/live-classes/${classId}/whiteboard`); } catch {}
+  };
+  const createBreakout = async () => {
+    try {
+      const { data } = await client.post(`/live-classes/${classId}/breakout`, { count: breakoutCount });
+      setBreakoutRooms(data.rooms || []); // optimistic from response
+      setBreakoutActive(true);
+    } catch { await pollState(); }
+  };
+  const endBreakout = async () => {
+    setBreakoutActive(false); setBreakoutRooms([]); // optimistic
+    try { await client.delete(`/live-classes/${classId}/breakout`); } catch { await pollState(); }
+  };
 
   const onStrokeDone = (stroke: WbStroke) => {
     const s = { ...stroke, userId: String(user?._id || "") };
@@ -427,10 +537,34 @@ export default function LiveRoomScreen() {
   };
 
   const leaveRoom = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    if (role === "host") { client.post(`/live-classes/${classId}/end`).catch(() => {}); }
-    destroyEngine();
-    router.back();
+    if (role === "host") {
+      Alert.alert(
+        "End Class for Everyone?",
+        "This will end the class for all participants. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "End Class",
+            style: "destructive",
+            onPress: async () => {
+              setEnding(true);
+              if (pollRef.current) clearTimeout(pollRef.current);
+              try {
+                await client.post(`/live-classes/${classId}/end`);
+              } catch {
+                // Best-effort — still leave even if API fails
+              }
+              destroyEngine();
+              router.back();
+            },
+          },
+        ]
+      );
+    } else {
+      if (pollRef.current) clearTimeout(pollRef.current);
+      destroyEngine();
+      router.back();
+    }
   }, [classId, role]);
 
   useEffect(() => {
@@ -453,13 +587,15 @@ export default function LiveRoomScreen() {
   };
   const mutedUserUids = activeParticipants.filter(p => mutedUserIds.includes(p.user)).map(p => p.uid);
   const handBadge = role === "host" ? raisedHands.length + coHosts.length + waitingList.length : 0;
+  // Which participant this viewer currently has pinned to the main tile.
+  const effectiveMainId: number | "local" = mainId !== null ? mainId : remoteUids.length > 0 ? remoteUids[0] : "local";
 
   /* ── render: connecting / error states ───────────────────────────────── */
   if (phase === "loading" || phase === "connecting") {
     return (
       <View style={st.centerScreen}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator size="large" color="#7c3aed" />
+        <ActivityIndicator size="large" color="#0c2461" />
         <Text style={st.centerTxt}>{phase === "loading" ? "Loading class…" : "Joining live class…"}</Text>
       </View>
     );
@@ -471,7 +607,7 @@ export default function LiveRoomScreen() {
         <Ionicons name="hourglass-outline" size={44} color="#f59e0b" />
         <Text style={[st.centerTxt, { color: "#f59e0b", fontWeight: "700" }]}>Waiting for the host</Text>
         <Text style={[st.centerTxt, { fontSize: 13 }]}>The host has enabled a waiting room. You'll be let in automatically once they admit you.</Text>
-        <ActivityIndicator size="small" color="#7c3aed" style={{ marginTop: 8 }} />
+        <ActivityIndicator size="small" color="#0c2461" style={{ marginTop: 8 }} />
         <TouchableOpacity style={st.closeErrBtn} onPress={() => router.back()}>
           <Text style={st.closeErrTxt}>Cancel</Text>
         </TouchableOpacity>
@@ -531,8 +667,8 @@ export default function LiveRoomScreen() {
             <TouchableOpacity style={st.lockBtn} onPress={() => setIsFullScreen(true)}>
               <Ionicons name="expand" size={14} color="#9ca3af" />
             </TouchableOpacity>
-            <TouchableOpacity style={st.leaveBtn} onPress={inBreakout ? returnFromBreakout : leaveRoom}>
-              <Text style={st.leaveBtnTxt}>{inBreakout ? "↩ Main" : role === "host" ? "End" : "Leave"}</Text>
+            <TouchableOpacity style={[st.leaveBtn, ending && { opacity: 0.6 }]} onPress={inBreakout ? returnFromBreakout : leaveRoom} disabled={ending}>
+              <Text style={st.leaveBtnTxt}>{ending ? "Ending…" : inBreakout ? "↩ Main" : role === "host" ? "End" : "Leave"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -555,48 +691,58 @@ export default function LiveRoomScreen() {
 
       {/* Video area */}
       <View style={st.videoArea}>
-        {/* Main view: the other participant(s) — like Zoom's speaker view */}
-        {remoteUids.length > 0 ? (
-          remoteUids.map(uid => (
-            <View key={uid} style={st.tile}>
-              <RtcSurfaceView canvas={{ uid }} style={StyleSheet.absoluteFill} />
-              <Text style={st.tileLabel}>{inBreakout ? "Participant" : nameForUid(uid)}{mutedUserUids.includes(uid) ? " 🔇" : ""}</Text>
+        {/* Main tile: whichever participant this viewer has pinned (tap any small
+            tile to pin it; defaults to the first remote participant, or yourself
+            if you're alone). Tapping the main tile pins yourself instead. */}
+        {effectiveMainId === "local" ? (
+          connInfo && canPublish && localUid !== null ? (
+            <TouchableOpacity activeOpacity={0.9} style={st.tile} onPress={() => remoteUids.length > 0 && setMainId(remoteUids[0])}>
+              {isScreenSharing ? (
+                <View style={st.screenSharingBox}>
+                  <Ionicons name="tv-outline" size={40} color="#60a5fa" />
+                  <Text style={st.screenSharingTxt}>You're sharing your screen</Text>
+                </View>
+              ) : (
+                <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+              )}
+              <Text style={st.tileLabel}>You {role === "host" ? "(Host)" : isOneToOneGuest ? "" : "(Co-host)"}{isMuted ? " 🔇" : ""}{isScreenSharing ? " 🖥️" : ""}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={st.waitingBox}>
+              <Text style={{ fontSize: 40 }}>⏳</Text>
+              <Text style={st.waitingTxt}>Waiting for host…</Text>
+              {isHandRaised && <Text style={st.handTxt}>✋ Hand raised — host can see your request</Text>}
             </View>
-          ))
-        ) : connInfo && canPublish && localUid !== null ? (
-          // Nobody else here yet — nothing to show as "main", so your own video fills the space
-          <View style={st.tile}>
-            {isScreenSharing ? (
-              <View style={st.screenSharingBox}>
-                <Ionicons name="tv-outline" size={40} color="#a78bfa" />
-                <Text style={st.screenSharingTxt}>You're sharing your screen</Text>
-              </View>
-            ) : (
-              <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
-            )}
-            <Text style={st.tileLabel}>You {role === "host" ? "(Host)" : isOneToOneGuest ? "" : "(Co-host)"}{isMuted ? " 🔇" : ""}{isScreenSharing ? " 🖥️" : ""}</Text>
-          </View>
+          )
         ) : (
-          <View style={st.waitingBox}>
-            <Text style={{ fontSize: 40 }}>⏳</Text>
-            <Text style={st.waitingTxt}>Waiting for host…</Text>
-            {isHandRaised && <Text style={st.handTxt}>✋ Hand raised — host can see your request</Text>}
-          </View>
+          <TouchableOpacity activeOpacity={0.9} style={st.tile} onPress={() => setMainId("local")}>
+            <RtcSurfaceView canvas={{ uid: effectiveMainId }} style={StyleSheet.absoluteFill} />
+            <Text style={st.tileLabel}>{inBreakout ? "Participant" : nameForUid(effectiveMainId)}{mutedUserUids.includes(effectiveMainId) ? " 🔇" : ""}</Text>
+          </TouchableOpacity>
         )}
 
-        {/* Your own video — small corner thumbnail once someone else is on the main view */}
-        {remoteUids.length > 0 && connInfo && canPublish && localUid !== null && (
-          <View style={st.localPip}>
-            {isScreenSharing ? (
-              <View style={st.screenSharingBox}>
-                <Ionicons name="tv-outline" size={20} color="#a78bfa" />
-              </View>
-            ) : (
-              <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
-            )}
-            <Text style={st.pipLabel}>You{isMuted ? " 🔇" : ""}</Text>
-          </View>
-        )}
+        {/* Small strip: everyone not currently pinned to the main tile — tap any
+            of these to swap it into the main tile. */}
+        <View style={st.smallStrip} pointerEvents="box-none">
+          {effectiveMainId !== "local" && connInfo && canPublish && localUid !== null && (
+            <TouchableOpacity style={st.localPip} onPress={() => setMainId("local")}>
+              {isScreenSharing ? (
+                <View style={st.screenSharingBox}>
+                  <Ionicons name="tv-outline" size={20} color="#60a5fa" />
+                </View>
+              ) : (
+                <RtcSurfaceView canvas={{ uid: 0 }} style={StyleSheet.absoluteFill} />
+              )}
+              <Text style={st.pipLabel}>You{isMuted ? " 🔇" : ""}</Text>
+            </TouchableOpacity>
+          )}
+          {remoteUids.filter(uid => uid !== effectiveMainId).map(uid => (
+            <TouchableOpacity key={uid} style={st.localPip} onPress={() => setMainId(uid)}>
+              <RtcSurfaceView canvas={{ uid }} style={StyleSheet.absoluteFill} />
+              <Text style={st.pipLabel}>{inBreakout ? "Participant" : nameForUid(uid)}{mutedUserUids.includes(uid) ? " 🔇" : ""}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Floating reactions */}
         {floatingReactions.map(r => (
@@ -630,8 +776,8 @@ export default function LiveRoomScreen() {
                 </TouchableOpacity>
               </>
             )}
-            <TouchableOpacity style={[st.fsBtn, { backgroundColor: "#dc2626" }]} onPress={inBreakout ? returnFromBreakout : leaveRoom}>
-              <Ionicons name="call" size={18} color="#fff" />
+            <TouchableOpacity style={[st.fsBtn, { backgroundColor: "#dc2626" }, ending && { opacity: 0.5 }]} onPress={inBreakout ? returnFromBreakout : leaveRoom} disabled={ending}>
+              <Ionicons name={ending ? "hourglass" : "call"} size={18} color="#fff" />
             </TouchableOpacity>
           </View>
         )}
@@ -685,7 +831,7 @@ export default function LiveRoomScreen() {
                       <View key={w.user} style={st.personRow}>
                         <Text style={st.personName}>{w.name}</Text>
                         {admittingIds.includes(w.user) ? (
-                          <ActivityIndicator size="small" color="#7c3aed" />
+                          <ActivityIndicator size="small" color="#0c2461" />
                         ) : (
                           <View style={{ flexDirection: "row", gap: 6 }}>
                             <TouchableOpacity style={st.smallBtnGhost} onPress={() => denyFromWaitingRoom(w.user)}><Text style={st.smallBtnGhostTxt}>Deny</Text></TouchableOpacity>
@@ -772,7 +918,7 @@ export default function LiveRoomScreen() {
                     return (
                       <View key={i} style={{ alignItems: isSelf ? "flex-end" : "flex-start", marginBottom: 8 }}>
                         <Text style={st.chatSender}>{m.name}</Text>
-                        <View style={[st.chatBubble, { backgroundColor: isSelf ? "#7c3aed" : "#1e1b4b" }]}>
+                        <View style={[st.chatBubble, { backgroundColor: isSelf ? "#0c2461" : "#0f2557" }]}>
                           <Text style={st.chatBubbleTxt}>{m.text}</Text>
                         </View>
                       </View>
@@ -798,7 +944,7 @@ export default function LiveRoomScreen() {
                   <TouchableOpacity style={[st.wbToolBtn, wbTool === "eraser" && st.wbToolBtnActive]} onPress={() => setWbTool("eraser")}>
                     <Text style={st.wbToolTxt}>🧹 Erase</Text>
                   </TouchableOpacity>
-                  {["#ffffff", "#f87171", "#34d399", "#60a5fa", "#fbbf24", "#a78bfa"].map(c => (
+                  {["#ffffff", "#f87171", "#34d399", "#60a5fa", "#fbbf24", "#60a5fa"].map(c => (
                     <TouchableOpacity key={c} onPress={() => { setWbColor(c); setWbTool("pen"); }}
                       style={[st.wbColorDot, { backgroundColor: c, borderColor: wbColor === c ? "#fff" : "transparent" }]} />
                   ))}
@@ -856,7 +1002,7 @@ export default function LiveRoomScreen() {
 const TBtn: React.FC<{ icon: React.ComponentProps<typeof Ionicons>["name"]; active?: boolean; badge?: number; disabled?: boolean; onPress: () => void }> =
   ({ icon, active, badge, disabled, onPress }) => (
     <TouchableOpacity style={[st.tBtn, active && st.tBtnActive]} onPress={onPress} disabled={disabled}>
-      <Ionicons name={icon} size={20} color={disabled ? "#6b7280" : active ? "#a78bfa" : "#d1d5db"} />
+      <Ionicons name={icon} size={20} color={disabled ? "#6b7280" : active ? "#60a5fa" : "#d1d5db"} />
       {!!badge && badge > 0 && <View style={st.tBtnBadge}><Text style={st.tBtnBadgeTxt}>{badge > 9 ? "9+" : badge}</Text></View>}
     </TouchableOpacity>
   );
@@ -865,10 +1011,10 @@ const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0a0910" },
   centerScreen: { flex: 1, backgroundColor: "#0a0910", alignItems: "center", justifyContent: "center", padding: 24, gap: 10 },
   centerTxt: { color: "#9ca3af", textAlign: "center" },
-  closeErrBtn: { marginTop: 16, borderWidth: 1, borderColor: "#3730a3", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
-  closeErrTxt: { color: "#a78bfa", fontWeight: "700" },
+  closeErrBtn: { marginTop: 16, borderWidth: 1, borderColor: "#0c2461", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
+  closeErrTxt: { color: "#60a5fa", fontWeight: "700" },
 
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#13122a", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#1e1b4b" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#071528", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#0f2557" },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
   liveBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(239,68,68,0.15)", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(239,68,68,0.4)" },
@@ -878,15 +1024,15 @@ const st = StyleSheet.create({
   recBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(220,38,38,0.15)", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(220,38,38,0.4)" },
   recDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#dc2626" },
   recBadgeTxt: { color: "#dc2626", fontSize: 10, fontWeight: "800" },
-  coHostBadge: { backgroundColor: "rgba(124,58,237,0.2)", borderWidth: 1, borderColor: "rgba(124,58,237,0.4)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  coHostTxt: { color: "#a78bfa", fontSize: 10, fontWeight: "700" },
+  coHostBadge: { backgroundColor: "rgba(30,58,138,0.2)", borderWidth: 1, borderColor: "rgba(30,58,138,0.4)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  coHostTxt: { color: "#60a5fa", fontSize: 10, fontWeight: "700" },
   nqDot: { width: 7, height: 7, borderRadius: 4 },
   nqTxt: { color: "#9ca3af", fontSize: 10 },
   leaveBtn: { backgroundColor: "#dc2626", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   leaveBtnTxt: { color: "#fff", fontSize: 12, fontWeight: "700" },
   lockBtn: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)" },
   lockBtnActive: { backgroundColor: "rgba(245,158,11,0.18)" },
-  reactionPicker: { position: "absolute", bottom: 10, left: 12, right: 12, flexDirection: "row", justifyContent: "space-around", backgroundColor: "rgba(19,18,42,0.95)", borderRadius: 26, paddingVertical: 8, borderWidth: 1, borderColor: "#1e1b4b" },
+  reactionPicker: { position: "absolute", bottom: 10, left: 12, right: 12, flexDirection: "row", justifyContent: "space-around", backgroundColor: "rgba(19,18,42,0.95)", borderRadius: 26, paddingVertical: 8, borderWidth: 1, borderColor: "#0f2557" },
   reactionPickerBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   muteAllBtn: { borderWidth: 1, borderColor: "rgba(239,68,68,0.4)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, minWidth: 60, alignItems: "center" },
   muteAllBtnTxt: { color: "#f87171", fontSize: 11, fontWeight: "700" },
@@ -903,38 +1049,39 @@ const st = StyleSheet.create({
   videoArea: { flex: 1, backgroundColor: "#000" },
   tile: { flex: 1, backgroundColor: "#111", position: "relative", minHeight: 160 },
   tileLabel: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 11, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 5 },
-  localPip: { position: "absolute", bottom: 14, right: 14, width: 110, height: 148, borderRadius: 10, overflow: "hidden", backgroundColor: "#111", borderWidth: 2, borderColor: "#3730a3", elevation: 6, zIndex: 5 },
+  smallStrip: { position: "absolute", bottom: 14, right: 14, alignItems: "flex-end", gap: 8, zIndex: 5 },
+  localPip: { width: 110, height: 148, borderRadius: 10, overflow: "hidden", backgroundColor: "#111", borderWidth: 2, borderColor: "#0c2461", elevation: 6 },
   pipLabel: { position: "absolute", bottom: 5, left: 5, backgroundColor: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 9, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   waitingBox: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   waitingTxt: { color: "#6b7280", fontSize: 14 },
-  screenSharingBox: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#1e1b4b" },
-  screenSharingTxt: { color: "#a78bfa", fontSize: 13, fontWeight: "600" },
+  screenSharingBox: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#0f2557" },
+  screenSharingTxt: { color: "#60a5fa", fontSize: 13, fontWeight: "600" },
   handTxt: { color: "#f59e0b", fontSize: 12 },
 
-  toolbar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#13122a", borderTopWidth: 1, borderTopColor: "#1e1b4b", paddingHorizontal: 14, paddingVertical: 10, justifyContent: "center" },
+  toolbar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#071528", borderTopWidth: 1, borderTopColor: "#0f2557", paddingHorizontal: 14, paddingVertical: 10, justifyContent: "center" },
   toolbarSep: { width: 1, height: 28, backgroundColor: "#2a274a" },
   tBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", position: "relative" },
-  tBtnActive: { backgroundColor: "rgba(124,58,237,0.25)" },
+  tBtnActive: { backgroundColor: "rgba(30,58,138,0.25)" },
   tBtnBadge: { position: "absolute", top: 0, right: 0, backgroundColor: "#ef4444", borderRadius: 9, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   tBtnBadgeTxt: { color: "#fff", fontSize: 9, fontWeight: "800" },
 
   panelBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-  panelSheet: { height: "62%", backgroundColor: "#13122a", borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: "hidden" },
+  panelSheet: { height: "62%", backgroundColor: "#071528", borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: "hidden" },
   panelHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.2)", alignSelf: "center", marginTop: 10, marginBottom: 4 },
-  panelTabs: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#1e1b4b" },
+  panelTabs: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#0f2557" },
   panelTab: { flex: 1, paddingVertical: 11, alignItems: "center", borderBottomWidth: 2, borderBottomColor: "transparent" },
-  panelTabActive: { borderBottomColor: "#7c3aed" },
+  panelTabActive: { borderBottomColor: "#0c2461" },
   panelTabTxt: { color: "#6b7280", fontSize: 11, fontWeight: "700" },
-  panelTabTxtActive: { color: "#a78bfa" },
+  panelTabTxtActive: { color: "#60a5fa" },
   panelBody: { flex: 1, padding: 12 },
-  panelSectionTitle: { color: "#a78bfa", fontSize: 10, fontWeight: "800", letterSpacing: 0.6, marginBottom: 6, marginTop: 6 },
-  personRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "rgba(124,58,237,0.08)", borderRadius: 8, padding: 9, marginBottom: 5 },
+  panelSectionTitle: { color: "#60a5fa", fontSize: 10, fontWeight: "800", letterSpacing: 0.6, marginBottom: 6, marginTop: 6 },
+  personRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "rgba(30,58,138,0.08)", borderRadius: 8, padding: 9, marginBottom: 5 },
   personName: { color: "#f3f4f6", fontSize: 13, fontWeight: "600" },
   personNameMuted: { color: "#9ca3af", fontSize: 13 },
-  smallBtnPrimary: { backgroundColor: "#7c3aed", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
+  smallBtnPrimary: { backgroundColor: "#0c2461", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
   smallBtnTxt: { color: "#fff", fontSize: 10, fontWeight: "700" },
-  smallBtnGhost: { borderWidth: 1, borderColor: "#3730a3", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
-  smallBtnGhostTxt: { color: "#a78bfa", fontSize: 10, fontWeight: "700" },
+  smallBtnGhost: { borderWidth: 1, borderColor: "#0c2461", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
+  smallBtnGhostTxt: { color: "#60a5fa", fontSize: 10, fontWeight: "700" },
   smallBtnDanger: { borderWidth: 1, borderColor: "rgba(239,68,68,0.4)", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
   smallBtnDangerTxt: { color: "#f87171", fontSize: 10, fontWeight: "700" },
 
@@ -942,13 +1089,13 @@ const st = StyleSheet.create({
   chatSender: { color: "#6b7280", fontSize: 9, marginBottom: 2, paddingHorizontal: 4 },
   chatBubble: { maxWidth: "78%", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
   chatBubbleTxt: { color: "#f3f4f6", fontSize: 13 },
-  chatInputRow: { flexDirection: "row", gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: "#1e1b4b" },
-  chatInput: { flex: 1, backgroundColor: "#0a0910", borderWidth: 1, borderColor: "#1e1b4b", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, color: "#f3f4f6", fontSize: 13 },
-  chatSendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#7c3aed", alignItems: "center", justifyContent: "center" },
+  chatInputRow: { flexDirection: "row", gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: "#0f2557" },
+  chatInput: { flex: 1, backgroundColor: "#0a0910", borderWidth: 1, borderColor: "#0f2557", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, color: "#f3f4f6", fontSize: 13 },
+  chatSendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#0c2461", alignItems: "center", justifyContent: "center" },
 
-  wbToolbar: { flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderBottomWidth: 1, borderBottomColor: "#1e1b4b", flexWrap: "wrap" },
-  wbToolBtn: { borderWidth: 1, borderColor: "#1e1b4b", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
-  wbToolBtnActive: { borderColor: "#7c3aed", backgroundColor: "rgba(124,58,237,0.2)" },
+  wbToolbar: { flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderBottomWidth: 1, borderBottomColor: "#0f2557", flexWrap: "wrap" },
+  wbToolBtn: { borderWidth: 1, borderColor: "#0f2557", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
+  wbToolBtnActive: { borderColor: "#0c2461", backgroundColor: "rgba(30,58,138,0.2)" },
   wbToolTxt: { color: "#d1d5db", fontSize: 11 },
   wbColorDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2 },
   wbClearBtn: { marginLeft: "auto", borderWidth: 1, borderColor: "rgba(239,68,68,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
@@ -956,14 +1103,14 @@ const st = StyleSheet.create({
   wbViewOnly: { textAlign: "center", color: "#6b7280", fontSize: 11, padding: 6 },
 
   breakoutDesc: { color: "#9ca3af", fontSize: 12, marginBottom: 12 },
-  roomCountBtn: { flex: 1, paddingVertical: 10, borderWidth: 1.5, borderColor: "#1e1b4b", borderRadius: 10, alignItems: "center" },
-  roomCountBtnActive: { borderColor: "#7c3aed", backgroundColor: "rgba(124,58,237,0.2)" },
+  roomCountBtn: { flex: 1, paddingVertical: 10, borderWidth: 1.5, borderColor: "#0f2557", borderRadius: 10, alignItems: "center" },
+  roomCountBtnActive: { borderColor: "#0c2461", backgroundColor: "rgba(30,58,138,0.2)" },
   roomCountTxt: { color: "#9ca3af", fontSize: 16, fontWeight: "800" },
-  roomCountTxtActive: { color: "#a78bfa" },
-  startBreakoutBtn: { backgroundColor: "#7c3aed", borderRadius: 10, paddingVertical: 13, alignItems: "center" },
+  roomCountTxtActive: { color: "#60a5fa" },
+  startBreakoutBtn: { backgroundColor: "#0c2461", borderRadius: 10, paddingVertical: 13, alignItems: "center" },
   startBreakoutTxt: { color: "#fff", fontWeight: "700", fontSize: 13 },
   breakoutActiveTxt: { color: "#22c55e", fontSize: 12, fontWeight: "700", marginBottom: 10 },
-  roomCard: { backgroundColor: "#1e1b4b", borderRadius: 10, padding: 12, marginBottom: 8 },
+  roomCard: { backgroundColor: "#0f2557", borderRadius: 10, padding: 12, marginBottom: 8 },
   roomCardTitle: { color: "#f3f4f6", fontSize: 13, fontWeight: "700", marginBottom: 3 },
   roomCardSub: { color: "#9ca3af", fontSize: 11 },
   endBreakoutBtn: { backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.4)", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 6 },

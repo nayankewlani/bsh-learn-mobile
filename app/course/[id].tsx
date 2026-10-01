@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
+﻿import React, { useEffect, useState } from "react";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
+import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import client from "../../api/client";
 import { COLORS } from "../../constants";
+import { purchaseCourse, restorePurchases } from "../../services/purchaseService";
 
 interface Lesson { _id: string; title: string; isFree: boolean; duration: number; muxPlaybackId?: string; chapter: string; }
 interface Chapter { _id: string; title: string; order: number; }
-interface Course { _id: string; title: string; description: string; educator: { name: string }; category: string; level: string; price: number; discountPrice?: number; thumbnail: string; rating: number; enrollmentCount: number; totalLessons: number; requirements: string[]; objectives: string[]; }
+interface Course { _id: string; title: string; description: string; educator: { name: string }; category: string; level: string; price: number; discountPrice?: number; thumbnail: string; rating: number; enrollmentCount: number; totalLessons: number; requirements: string[]; objectives: string[]; razorpayPaymentLink?: string; }
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,6 +20,21 @@ export default function CourseDetailScreen() {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      const { restoredCount } = await restorePurchases();
+      if (restoredCount > 0) {
+        // Re-fetch this course's enrollment status in case it was just restored.
+        client.get(`/courses/${id}`).then(({ data }) => setIsEnrolled(data.isEnrolled)).catch(() => {});
+        Alert.alert("Restored", `Recovered ${restoredCount} purchase${restoredCount > 1 ? "s" : ""}.`);
+      } else {
+        Alert.alert("Nothing to Restore", "No pending purchases were found for this account.");
+      }
+    } finally { setRestoring(false); }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -40,9 +57,21 @@ export default function CourseDetailScreen() {
         setIsEnrolled(true);
         Alert.alert("Enrolled!", "You now have access to this course");
       } finally { setEnrolling(false); }
-    } else {
-      Alert.alert("Purchase Required", "Open on web to complete payment");
+      return;
     }
+    setEnrolling(true);
+    try {
+      const result = await purchaseCourse({
+        courseId: course!._id, title: course!.title,
+        priceRupees: course!.price, discountPriceRupees: course!.discountPrice,
+        razorpayPaymentLink: course!.razorpayPaymentLink,
+        userName: user.name, userEmail: user.email,
+      });
+      if (result.success) {
+        setIsEnrolled(true);
+        Alert.alert("Enrolled! 🎉", `You're now enrolled in ${course!.title}!`);
+      }
+    } finally { setEnrolling(false); }
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.primary} size="large" /></View>;
@@ -53,7 +82,7 @@ export default function CourseDetailScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {course.thumbnail ? (
-        <Image source={{ uri: course.thumbnail }} style={styles.thumbnail} />
+        <Image source={{ uri: course.thumbnail }} style={styles.thumbnail} contentFit="cover" cachePolicy="disk" />
       ) : (
         <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
           <Text style={{ fontSize: 48 }}>📚</Text>
@@ -74,11 +103,19 @@ export default function CourseDetailScreen() {
 
         {!isEnrolled && (
           <View style={styles.priceBox}>
-            <Text style={styles.price}>{price === 0 ? "Free" : `₹${(price / 100).toLocaleString()}`}</Text>
+            <Text style={styles.price}>{price === 0 ? "Free" : `₹${price.toLocaleString()}`}</Text>
             <TouchableOpacity style={styles.enrollBtn} onPress={enroll} disabled={enrolling}>
               <Text style={styles.enrollBtnText}>{enrolling ? "Enrolling..." : isEnrolled ? "Enrolled ✓" : price === 0 ? "Enroll Free" : "Buy Now"}</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {!isEnrolled && price > 0 && Platform.OS === "ios" && (
+          <TouchableOpacity onPress={handleRestore} disabled={restoring} style={{ alignSelf: "center", marginBottom: 16 }}>
+            <Text style={{ color: COLORS.textMuted, fontSize: 13, textDecorationLine: "underline" }}>
+              {restoring ? "Restoring…" : "Restore Purchases"}
+            </Text>
+          </TouchableOpacity>
         )}
 
         {isEnrolled && lessons.length > 0 && (
@@ -140,7 +177,7 @@ const styles = StyleSheet.create({
   section: { marginTop: 20 },
   sectionTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginBottom: 12 },
   listItem: { flexDirection: "row", gap: 10, marginBottom: 8 },
-  listText: { color: "#c4b5fd", fontSize: 14, flex: 1 },
+  listText: { color: "#93c5fd", fontSize: 14, flex: 1 },
   chapter: { backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 12, overflow: "hidden" },
   chapterTitle: { color: COLORS.text, fontWeight: "700", fontSize: 14, padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.surface2 },
   lesson: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.surface2 },

@@ -2,7 +2,7 @@
   "expo": {
     "name": "BSH Healers",
     "slug": "bsh-learn",
-    "version": "3.3.0",
+    "version": "4.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,7 +17,14 @@
       "bundleIdentifier": "com.bshlearn.app",
       "infoPlist": {
         "NSCameraUsageDescription": "BSH Healers needs camera access so you can join live video classes.",
-        "NSMicrophoneUsageDescription": "BSH Healers needs microphone access so you can speak in live video classes."
+        "NSMicrophoneUsageDescription": "BSH Healers needs microphone access so you can speak in live video classes.",
+        "NSPhotoLibraryUsageDescription": "BSH Healers needs access to your photo library so you can upload a profile picture or attach images.",
+        "NSPhotoLibraryAddUsageDescription": "BSH Healers needs permission to save images to your photo library.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification"]
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -36,14 +43,6 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.VIBRATE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.INTERNET",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.POST_NOTIFICATIONS"
       ]
     },
@@ -55,6 +54,7 @@
     "plugins": [
       "expo-router",
       "./plugins/withAgoraFix",
+      "react-native-iap",
       [
         "expo-notifications",
         {
@@ -72,7 +72,12 @@
             "targetSdkVersion": 36,
             "minSdkVersion": 24,
             "buildToolsVersion": "36.0.0",
-            "ndkVersion": "27.1.12297006"
+            "ndkVersion": "27.1.12297006",
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
           }
         }
       ]

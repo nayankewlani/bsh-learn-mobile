@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   ActivityIndicator, Alert, Switch,
@@ -282,7 +282,7 @@ export default function ScheduleLiveScreen() {
                   <Text style={s.startNowTitle}>🔴 Go Live Now</Text>
                   <Text style={s.startNowSub}>Start broadcasting immediately after submitting</Text>
                 </View>
-                <Switch value={startNow} onValueChange={setStartNow} trackColor={{ false: COLORS.border, true: "#7c3aed" }} thumbColor="#fff" />
+                <Switch value={startNow} onValueChange={setStartNow} trackColor={{ false: COLORS.border, true: "#FF1E56" }} thumbColor="#fff" />
               </View>
               {!startNow && (
                 <View style={{ marginTop: 12 }}>
@@ -316,7 +316,7 @@ const s = StyleSheet.create({
 
   accessRow: { flexDirection: "row", gap: 8, marginBottom: 20 },
   accessCard: { flex: 1, borderWidth: 2, borderColor: COLORS.border, borderRadius: 12, padding: 12, backgroundColor: COLORS.surface },
-  accessCardActive: { borderColor: "#7c3aed", backgroundColor: "rgba(124,58,237,0.12)" },
+  accessCardActive: { borderColor: "#FF1E56", backgroundColor: "rgba(30,58,138,0.12)" },
   accessTitle: { color: COLORS.text, fontSize: 11, fontWeight: "700", marginTop: 6 },
   accessDesc: { color: COLORS.textMuted, fontSize: 10, marginTop: 2 },
 
@@ -332,8 +332,8 @@ const s = StyleSheet.create({
   permBannerTitlePending: { color: "#d97706", fontWeight: "700", fontSize: 14 },
   permBannerTitleApproved: { color: "#22c55e", fontWeight: "700", fontSize: 14 },
   permBannerTxt: { color: COLORS.textMuted, fontSize: 12, marginTop: 4 },
-  primaryBtn: { backgroundColor: "#7c3aed", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-  primaryBtnSm: { backgroundColor: "#7c3aed", borderRadius: 10, paddingVertical: 11, alignItems: "center", marginTop: 8 },
+  primaryBtn: { backgroundColor: "#FF1E56", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
+  primaryBtnSm: { backgroundColor: "#FF1E56", borderRadius: 10, paddingVertical: 11, alignItems: "center", marginTop: 8 },
   primaryBtnTxt: { color: "#fff", fontWeight: "800", fontSize: 14 },
 
   card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, padding: 16, marginBottom: 12 },
@@ -344,7 +344,7 @@ const s = StyleSheet.create({
   statusPillTxt: { fontSize: 10, fontWeight: "800" },
 
   courseChip: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: COLORS.surface },
-  courseChipActive: { backgroundColor: "#7c3aed", borderColor: "#7c3aed" },
+  courseChipActive: { backgroundColor: "#FF1E56", borderColor: "#FF1E56" },
   courseChipTxt: { color: COLORS.textMuted, fontSize: 12 },
   courseChipTxtActive: { color: "#fff" },
 

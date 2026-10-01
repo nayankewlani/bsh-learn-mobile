@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, Modal, ActivityIndicator, Image,
+  TextInput, Alert, Modal, ActivityIndicator,
   Switch,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,12 +33,12 @@ const EMPTY_FORM: FormData = {
   title: "",
   educator: "",
   subject: "Hypnosis",
-  subjectColor: "#7c3aed",
+  subjectColor: "#FF1E56",
   lang: "Hindi",
   thumbnailUrl: "",
   recordingUrl: "",
   views: "0",
-  bgColor: "#1e1b4b",
+  bgColor: "#F5F7FA",
   isFeatured: false,
   isActive: true,
   order: 0,
@@ -190,7 +191,7 @@ export default function AdminHomeClasses() {
             <View key={cls._id} style={styles.card}>
               <View style={styles.cardLeft}>
                 {cls.thumbnailUrl ? (
-                  <Image source={{ uri: cls.thumbnailUrl }} style={styles.thumb} />
+                  <Image source={{ uri: cls.thumbnailUrl }} style={styles.thumb} contentFit="cover" cachePolicy="disk" />
                 ) : (
                   <View style={[styles.thumb, styles.thumbPlaceholder]}>
                     <Text style={{ fontSize: 22 }}>🧠</Text>
@@ -219,14 +220,14 @@ export default function AdminHomeClasses() {
                     value={cls.isActive}
                     onValueChange={() => toggleActive(cls)}
                     thumbColor={cls.isActive ? COLORS.primary : "#6b7280"}
-                    trackColor={{ false: "#1e1b4b", true: COLORS.primary + "55" }}
+                    trackColor={{ false: "#F5F7FA", true: COLORS.primary + "55" }}
                   />
                 </View>
               </View>
 
               <View style={styles.cardActions}>
                 <TouchableOpacity onPress={() => openEdit(cls)} style={styles.editBtn}>
-                  <Ionicons name="pencil-outline" size={18} color="#60a5fa" />
+                  <Ionicons name="pencil-outline" size={18} color="#FF6B8A" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleDelete(cls)} style={styles.delBtn}>
                   <Ionicons name="trash-outline" size={18} color="#ef4444" />
@@ -296,14 +297,14 @@ export default function AdminHomeClasses() {
                 <Text style={styles.fieldLabel}>Featured (Most Engaging section)</Text>
                 <Switch value={form.isFeatured} onValueChange={v => setField("isFeatured", v)}
                   thumbColor={form.isFeatured ? COLORS.primary : "#6b7280"}
-                  trackColor={{ false: "#1e1b4b", true: COLORS.primary + "55" }} />
+                  trackColor={{ false: "#F5F7FA", true: COLORS.primary + "55" }} />
               </View>
 
               <View style={styles.switchRow}>
                 <Text style={styles.fieldLabel}>Active (visible on Home)</Text>
                 <Switch value={form.isActive} onValueChange={v => setField("isActive", v)}
                   thumbColor={form.isActive ? "#22c55e" : "#6b7280"}
-                  trackColor={{ false: "#1e1b4b", true: "#22c55e55" }} />
+                  trackColor={{ false: "#F5F7FA", true: "#22c55e55" }} />
               </View>
 
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: "#12103a", borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   backBtn: { padding: 4 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "800" },
@@ -345,12 +346,12 @@ const styles = StyleSheet.create({
   emptyBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
 
   card: {
-    backgroundColor: "#12103a", borderRadius: 14, padding: 12, marginBottom: 12,
-    flexDirection: "row", borderWidth: 1, borderColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 12, marginBottom: 12,
+    flexDirection: "row", borderWidth: 1, borderColor: "#F5F7FA",
   },
   cardLeft: { marginRight: 12 },
   thumb: { width: 72, height: 72, borderRadius: 10 },
-  thumbPlaceholder: { backgroundColor: "#1e1b4b", alignItems: "center", justifyContent: "center" },
+  thumbPlaceholder: { backgroundColor: "#F5F7FA", alignItems: "center", justifyContent: "center" },
   cardBody: { flex: 1, minWidth: 0 },
   cardTitle: { color: "#fff", fontSize: 14, fontWeight: "700", marginBottom: 2 },
   cardSub: { color: "#9ca3af", fontSize: 12, marginBottom: 6 },
@@ -369,29 +370,29 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" },
   modalCard: {
-    backgroundColor: "#12103a", borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    maxHeight: "92%", borderWidth: 1, borderColor: "#1e1b4b",
+    backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    maxHeight: "92%", borderWidth: 1, borderColor: "#F5F7FA",
   },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   modalTitle: { color: "#fff", fontSize: 18, fontWeight: "800" },
   modalBody: { padding: 20, gap: 4 },
   fieldLabel: { color: "#9ca3af", fontSize: 12, fontWeight: "600", marginBottom: 5 },
   input: {
-    backgroundColor: "#1e1b4b", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11,
+    backgroundColor: "#F5F7FA", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11,
     color: "#fff", fontSize: 14, marginBottom: 14, borderWidth: 1, borderColor: "#2d2a5e",
   },
   rowFields: { flexDirection: "row", marginBottom: 4 },
   chipBtn: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, marginRight: 8,
-    borderWidth: 1.5, borderColor: "#1e1b4b", backgroundColor: "#0a0914",
+    borderWidth: 1.5, borderColor: "#F5F7FA", backgroundColor: "#FFFFFF",
   },
   chipBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + "22" },
   chipTxt: { color: "#6b7280", fontSize: 12, fontWeight: "600" },
-  chipTxtActive: { color: "#c4b5fd" },
+  chipTxtActive: { color: "#93c5fd" },
   switchRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     marginBottom: 14,

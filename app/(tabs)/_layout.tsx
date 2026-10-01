@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+﻿import React, { useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from "react-native";
 import { Tabs, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -68,13 +68,13 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           bottom: BOTTOM,
           height: BAR_H,
           backgroundColor: isDark ? "rgba(13,11,31,0.97)" : "rgba(255,255,255,0.97)",
-          borderColor: isDark ? "rgba(124,58,237,0.28)" : "rgba(124,58,237,0.18)",
+          borderColor: isDark ? "rgba(30,58,138,0.28)" : "rgba(30,58,138,0.18)",
           transform: [{ translateY: tabBarY }],
         },
       ]}
     >
       {/* Subtle top accent line */}
-      <View style={[tb.accentLine, { backgroundColor: isDark ? "rgba(124,58,237,0.5)" : "rgba(124,58,237,0.3)" }]} />
+      <View style={[tb.accentLine, { backgroundColor: isDark ? "rgba(30,58,138,0.5)" : "rgba(12,36,97,0.25)" }]} />
 
       {visibleTabs.map((tab) => {
         const routeIndex = state.routes.findIndex(r => r.name === tab.name);
@@ -105,7 +105,7 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   {
                     transform: [{ scale: pulseAnim }],
                     opacity: glowAnim,
-                    borderColor: focused ? "#a78bfa" : "rgba(124,58,237,0.45)",
+                    borderColor: focused ? "#60a5fa" : "rgba(30,58,138,0.45)",
                   },
                 ]}
               />
@@ -114,8 +114,8 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 style={[
                   tb.specialBtn,
                   {
-                    backgroundColor: focused ? "#7c3aed" : "#6d28d9",
-                    shadowColor: "#7c3aed",
+                    backgroundColor: focused ? "#0c2461" : "#0c2461",
+                    shadowColor: "#0c2461",
                     shadowOpacity: focused ? 0.75 : 0.45,
                     shadowRadius: focused ? 14 : 8,
                     elevation: focused ? 12 : 7,
@@ -124,7 +124,7 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               >
                 <Ionicons name={focused ? tab.iconFocused : tab.icon} size={21} color="#fff" />
               </View>
-              <Text style={[tb.specialLabel, { color: focused ? "#a78bfa" : isDark ? "rgba(167,139,250,0.55)" : "rgba(124,58,237,0.55)" }]}
+              <Text style={[tb.specialLabel, { color: focused ? (isDark ? "#60a5fa" : "#0c2461") : isDark ? "rgba(96,165,250,0.55)" : "rgba(12,36,97,0.5)" }]}
                 numberOfLines={1}>
                 {tab.label}
               </Text>
@@ -140,7 +140,7 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
         // ── Regular tab ───────────────────────────────────────────────────────
         const color = focused
-          ? "#a78bfa"
+          ? (isDark ? "#60a5fa" : "#0c2461")
           : isDark ? "#6b7280" : "#9ca3af";
 
         return (
@@ -150,7 +150,7 @@ function BSHTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             onPress={onPress}
             activeOpacity={0.7}
           >
-            <View style={[tb.iconWrap, focused && { backgroundColor: isDark ? "rgba(124,58,237,0.16)" : "rgba(124,58,237,0.1)" }]}>
+            <View style={[tb.iconWrap, focused && { backgroundColor: isDark ? "rgba(30,58,138,0.16)" : "rgba(12,36,97,0.08)" }]}>
               <Ionicons name={focused ? tab.iconFocused : tab.icon} size={20} color={color} />
               {/* Live red dot on Live tab */}
               {tab.name === "live" && (
@@ -222,7 +222,7 @@ const tb = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#a78bfa",
+    backgroundColor: "#0c2461",
     marginTop: 2,
   },
   liveDot: {
@@ -294,7 +294,7 @@ export default function TabLayout() {
     <Tabs
       tabBar={(props) => <BSHTabBar {...props} />}
       screenOptions={{
-        headerStyle: { backgroundColor: "#13122a", borderBottomWidth: 0 },
+        headerStyle: { backgroundColor: "#0c2461", borderBottomWidth: 0 },
         headerTintColor: "#fff",
         headerTitleStyle: { fontWeight: "800", fontSize: 16 },
         headerShadowVisible: false,

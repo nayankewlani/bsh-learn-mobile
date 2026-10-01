@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Alert,
+  TextInput, ActivityIndicator, Alert, Platform, Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -10,7 +10,6 @@ import { useAuthStore } from "../stores/authStore";
 import { useThemeStore } from "../stores/themeStore";
 import { RAZORPAY_KEY_ID } from "../constants";
 import client from "../api/client";
-import { blockIOSPurchase } from "../lib/paymentGate";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -29,7 +28,7 @@ export default function BookSessionScreen() {
     expertId: string; expertName: string; expertColor?: string; sessionPricePaise?: string;
   }>();
 
-  const expertColor = params.expertColor || "#7c3aed";
+  const expertColor = params.expertColor || "#FF1E56";
   const dbSessionPricePaise = Number(params.sessionPricePaise || 0);
   const usePerSession = dbSessionPricePaise > 0;
 
@@ -52,34 +51,46 @@ export default function BookSessionScreen() {
 
   const handlePay = async () => {
     if (!user) { router.push("/(auth)/login"); return; }
-    if (blockIOSPurchase()) return;
-    if (!RazorpayCheckout) {
-      Alert.alert("Payment Not Available", "Payments require the full BSH app build (not Expo Go)."); return;
-    }
     setError(""); setPaying(true);
     try {
-      const { data } = await client.post("/consultation-bookings/create-order", {
-        trainerName: params.expertName, trainerId: params.expertId,
-        sessions, durationMins: duration, bonusSessions, totalPaise,
-        clientNote, preferredTime,
-      });
-      const paymentData = await RazorpayCheckout.open({
-        key: RAZORPAY_KEY_ID, amount: String(data.order.amount), currency: "INR",
-        name: "BSH Healers",
-        description: `${sessions} session${sessions > 1 ? "s" : ""} with ${params.expertName}`,
-        order_id: data.order.id,
-        prefill: { name: user.name, email: user.email },
-        theme: { color: expertColor },
-      });
-      await client.post("/consultation-bookings/verify", {
-        razorpayOrderId: paymentData.razorpay_order_id,
-        razorpayPaymentId: paymentData.razorpay_payment_id,
-        razorpaySignature: paymentData.razorpay_signature,
-      });
-      setBooked(true);
+      if (Platform.OS === "ios") {
+        // iOS: native Razorpay SDK not available on App Store builds.
+        // Create a hosted payment link and open it in Safari.
+        // The server webhook (payment_link.paid) marks the booking paid once Razorpay confirms.
+        const { data } = await client.post("/consultation-bookings/initiate-link", {
+          trainerName: params.expertName, trainerId: params.expertId,
+          sessions, durationMins: duration, clientNote, preferredTime,
+        });
+        await Linking.openURL(data.paymentUrl);
+        setBooked(true); // show confirmation UI; webhook handles actual fulfillment
+      } else {
+        // Android: native Razorpay SDK flow — stays in-app and returns payment IDs synchronously.
+        if (!RazorpayCheckout) {
+          Alert.alert("Payment Not Available", "Payments require the full BSH app build (not Expo Go)."); return;
+        }
+        const { data } = await client.post("/consultation-bookings/create-order", {
+          trainerName: params.expertName, trainerId: params.expertId,
+          sessions, durationMins: duration, bonusSessions, totalPaise,
+          clientNote, preferredTime,
+        });
+        const paymentData = await RazorpayCheckout.open({
+          key: RAZORPAY_KEY_ID, amount: String(data.order.amount), currency: "INR",
+          name: "BSH Healers",
+          description: `${sessions} session${sessions > 1 ? "s" : ""} with ${params.expertName}`,
+          order_id: data.order.id,
+          prefill: { name: user.name, email: user.email },
+          theme: { color: expertColor },
+        });
+        await client.post("/consultation-bookings/verify", {
+          razorpayOrderId: paymentData.razorpay_order_id,
+          razorpayPaymentId: paymentData.razorpay_payment_id,
+          razorpaySignature: paymentData.razorpay_signature,
+        });
+        setBooked(true);
+      }
     } catch (err: unknown) {
       const e = err as { code?: number; description?: string; response?: { data?: { message?: string } }; message?: string };
-      if (e?.code === 0) { setPaying(false); return; } // user cancelled checkout
+      if (e?.code === 0) { setPaying(false); return; }
       setError(e.response?.data?.message ?? e.description ?? e.message ?? "Failed to process payment");
     } finally { setPaying(false); }
   };
@@ -91,7 +102,10 @@ export default function BookSessionScreen() {
           <Text style={{ fontSize:56, marginBottom:14, textAlign:"center" }}>🎉</Text>
           <Text style={[s.doneTitle, { color:t.text }]}>Sessions Booked!</Text>
           <Text style={[s.doneTxt, { color:t.textMuted }]}>
-            Payment confirmed! <Text style={{ fontWeight:"800", color:t.text }}>{params.expertName}</Text> has been notified.
+            {Platform.OS === "ios"
+              ? <>Complete your payment in the browser. Once paid, <Text style={{ fontWeight:"800", color:t.text }}>{params.expertName}</Text> will be notified automatically.</>
+              : <>Payment confirmed! <Text style={{ fontWeight:"800", color:t.text }}>{params.expertName}</Text> has been notified.</>
+            }
           </Text>
           <Text style={[s.doneTxt, { color:t.textMuted }]}>
             You've booked <Text style={{ fontWeight:"800", color:t.text }}>{sessions} session{sessions > 1 ? "s" : ""}</Text>
@@ -101,7 +115,7 @@ export default function BookSessionScreen() {
           <Text style={[s.doneTxt, { color:t.textMuted, marginBottom:24 }]}>
             The trainer will propose a schedule. Once admin approves, you'll be notified with your session link.
           </Text>
-          <TouchableOpacity style={[s.payBtn, { backgroundColor:"#7c3aed" }]} onPress={() => router.replace("/(tabs)/dashboard")}>
+          <TouchableOpacity style={[s.payBtn, { backgroundColor:"#FF1E56" }]} onPress={() => router.replace("/(tabs)/dashboard")}>
             <Text style={s.payBtnTxt}>Go to Dashboard</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ marginTop:12 }} onPress={() => router.replace("/(tabs)/consultation")}>
@@ -129,7 +143,7 @@ export default function BookSessionScreen() {
           </View>
           <View>
             <Text style={{ color:t.text, fontWeight:"800", fontSize:15 }}>{params.expertName}</Text>
-            <Text style={{ color:"#7c3aed", fontSize:12, fontWeight:"700", marginTop:2 }}>₹{ratePerMin.toLocaleString("en-IN")}/min</Text>
+            <Text style={{ color:"#FF1E56", fontSize:12, fontWeight:"700", marginTop:2 }}>₹{ratePerMin.toLocaleString("en-IN")}/min</Text>
           </View>
         </View>
 
@@ -141,8 +155,8 @@ export default function BookSessionScreen() {
               const active = sessions === n;
               return (
                 <TouchableOpacity key={n} onPress={() => setSessions(n)}
-                  style={[s.sessBtn, { borderColor:active ? "#7c3aed" : t.border, backgroundColor:active ? "rgba(124,58,237,0.12)" : "transparent" }]}>
-                  <Text style={{ color:active ? "#a78bfa" : t.text, fontWeight:active ? "800" : "500", fontSize:15 }}>{n}</Text>
+                  style={[s.sessBtn, { borderColor:active ? "#FF1E56" : t.border, backgroundColor:active ? "rgba(30,58,138,0.12)" : "transparent" }]}>
+                  <Text style={{ color:active ? "#FF6B8A" : t.text, fontWeight:active ? "800" : "500", fontSize:15 }}>{n}</Text>
                   {n >= 5 && n % 5 === 0 && (
                     <View style={s.freeBadge}><Text style={s.freeBadgeTxt}>FREE</Text></View>
                   )}
@@ -170,8 +184,8 @@ export default function BookSessionScreen() {
               const active = duration === d;
               return (
                 <TouchableOpacity key={d} onPress={() => setDuration(d)}
-                  style={[s.durBtn, { borderColor:active ? "#7c3aed" : t.border, backgroundColor:active ? "rgba(124,58,237,0.12)" : "transparent" }]}>
-                  <Text style={{ color:active ? "#a78bfa" : t.text, fontWeight:active ? "800" : "500" }}>{d} min</Text>
+                  style={[s.durBtn, { borderColor:active ? "#FF1E56" : t.border, backgroundColor:active ? "rgba(30,58,138,0.12)" : "transparent" }]}>
+                  <Text style={{ color:active ? "#FF6B8A" : t.text, fontWeight:active ? "800" : "500" }}>{d} min</Text>
                 </TouchableOpacity>
               );
             })}
@@ -214,13 +228,13 @@ export default function BookSessionScreen() {
           </View>
           <View style={[s.summaryRow, { borderTopWidth:1, borderTopColor:t.border, paddingTop:12, marginTop:4 }]}>
             <Text style={{ color:t.text, fontWeight:"800", fontSize:16, flex:1 }}>Total</Text>
-            <Text style={{ color:"#7c3aed", fontWeight:"900", fontSize:20 }}>₹{totalRupees.toLocaleString("en-IN")}</Text>
+            <Text style={{ color:"#FF1E56", fontWeight:"900", fontSize:20 }}>₹{totalRupees.toLocaleString("en-IN")}</Text>
           </View>
         </View>
 
         {!!error && <Text style={s.errTxt}>⚠ {error}</Text>}
 
-        <TouchableOpacity style={[s.payBtn, { backgroundColor:paying ? "#9ca3af" : "#7c3aed" }]} onPress={handlePay} disabled={paying}>
+        <TouchableOpacity style={[s.payBtn, { backgroundColor:paying ? "#9ca3af" : "#FF1E56" }]} onPress={handlePay} disabled={paying}>
           {paying ? <ActivityIndicator color="#fff" /> : <Text style={s.payBtnTxt}>Pay ₹{totalRupees.toLocaleString("en-IN")}</Text>}
         </TouchableOpacity>
         <Text style={{ textAlign:"center", color:t.textMuted, fontSize:12, marginTop:12 }}>

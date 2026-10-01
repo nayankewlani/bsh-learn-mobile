@@ -8,17 +8,17 @@ export interface ThemeColors {
 }
 
 const DARK: ThemeColors = {
-  bg: "#0a0914", surface: "#13122a", surface2: "#1e1b4b", card: "#12103a",
-  border: "#3730a3", borderLight: "#2d2a5e", text: "#f3f4f6", textSec: "#d1d5db",
-  textMuted: "#9ca3af", accent: "#7c3aed", accentLight: "#a78bfa", navBg: "#2d0a6e",
-  inputBg: "#1e1b4b", statPill: "#1e1b4b",
+  bg: "#030c1a", surface: "#071528", surface2: "#0f2557", card: "#071223",
+  border: "#1e40af", borderLight: "#0f2557", text: "#f0f6ff", textSec: "#bfdbfe",
+  textMuted: "#94a3b8", accent: "#3b82f6", accentLight: "#60a5fa", navBg: "#030c1a",
+  inputBg: "#0f2557", statPill: "#0f2557",
 };
 
 const LIGHT: ThemeColors = {
-  bg: "#f5f3ff", surface: "#ffffff", surface2: "#ede9fe", card: "#ffffff",
-  border: "#e9d5ff", borderLight: "#ddd6fe", text: "#1f2937", textSec: "#374151",
-  textMuted: "#6b7280", accent: "#7c3aed", accentLight: "#6d28d9", navBg: "#7c3aed",
-  inputBg: "#ede9fe", statPill: "#ede9fe",
+  bg: "#ffffff", surface: "#ffffff", surface2: "#f0f4ff", card: "#ffffff",
+  border: "#c7d2fe", borderLight: "#e0e7ff", text: "#0f172a", textSec: "#334155",
+  textMuted: "#64748b", accent: "#0c2461", accentLight: "#1a4db5", navBg: "#0c2461",
+  inputBg: "#f0f4ff", statPill: "#e0e7ff",
 };
 
 interface ThemeStore {

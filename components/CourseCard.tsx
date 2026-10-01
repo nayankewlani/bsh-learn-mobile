@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Course } from "../stores/courseStore";
 import { COLORS } from "../constants";
@@ -10,7 +11,7 @@ interface Props {
   style?: ViewStyle;
 }
 
-const CourseCard: React.FC<Props> = ({ course, showProgress, style }) => {
+const CourseCard: React.FC<Props> = React.memo(({ course, showProgress, style }) => {
   const price = course.discountPrice ?? course.price;
 
   return (
@@ -20,10 +21,15 @@ const CourseCard: React.FC<Props> = ({ course, showProgress, style }) => {
       activeOpacity={0.85}
     >
       {course.thumbnail ? (
-        <Image source={{ uri: course.thumbnail }} style={styles.thumbnail} />
+        <Image
+          source={{ uri: course.thumbnail }}
+          style={styles.thumbnail}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
       ) : (
         <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-          <Text style={{ fontSize: 32 }}>📚</Text>
+          <Text style={styles.placeholderEmoji}>📚</Text>
         </View>
       )}
       <View style={styles.info}>
@@ -47,12 +53,15 @@ const CourseCard: React.FC<Props> = ({ course, showProgress, style }) => {
       </View>
     </TouchableOpacity>
   );
-};
+});
+
+CourseCard.displayName = "CourseCard";
 
 const styles = StyleSheet.create({
   card: { backgroundColor: COLORS.surface, borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: COLORS.surface2 },
   thumbnail: { width: "100%", height: 160 },
   thumbnailPlaceholder: { backgroundColor: COLORS.surface2, alignItems: "center", justifyContent: "center" },
+  placeholderEmoji: { fontSize: 32 },
   info: { padding: 12 },
   badge: { backgroundColor: "#3b0764", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginBottom: 6 },
   badgeText: { color: "#d8b4fe", fontSize: 11, fontWeight: "700" },

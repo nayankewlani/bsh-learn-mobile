@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, TextInput, Alert,
@@ -25,8 +25,8 @@ interface Session {
 const STATUS_ORDER: Status[] = ["pending", "contacted", "scheduled", "completed", "cancelled"];
 const STATUS_COLOR: Record<Status, string> = {
   pending:   "#f59e0b",
-  contacted: "#60a5fa",
-  scheduled: "#a78bfa",
+  contacted: "#FF6B8A",
+  scheduled: "#FF6B8A",
   completed: "#4ade80",
   cancelled: "#ef4444",
 };
@@ -178,25 +178,25 @@ const styles = StyleSheet.create({
 
   filterRow: {
     flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10,
-    gap: 8, backgroundColor: "#13122a", borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    gap: 8, backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#F5F7FA",
   },
   chip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: "#1e1b4b", borderWidth: 1, borderColor: "#3730a3",
+    backgroundColor: "#F5F7FA", borderWidth: 1, borderColor: "#FF1E56",
   },
   chipActive:     { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   chipText:       { color: COLORS.textMuted, fontSize: 12, fontWeight: "600" },
   chipTextActive: { color: "#fff" },
 
   card: {
-    backgroundColor: "#13122a", borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: "#1e1b4b", marginBottom: 10,
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: "#F5F7FA", marginBottom: 10,
   },
   cardTop:  { flexDirection: "row", alignItems: "flex-start", marginBottom: 6 },
   name:     { color: COLORS.text, fontWeight: "700", fontSize: 15, marginBottom: 2 },
   email:    { color: COLORS.textMuted, fontSize: 12 },
   phone:    { color: COLORS.textMuted, fontSize: 12, marginTop: 1 },
-  type:     { color: "#a78bfa", fontSize: 12, fontWeight: "600", marginBottom: 6 },
+  type:     { color: "#FF6B8A", fontSize: 12, fontWeight: "600", marginBottom: 6 },
   cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   date:     { color: "#6b7280", fontSize: 11 },
   tapHint:  { color: "#4b5563", fontSize: 10, fontStyle: "italic" },

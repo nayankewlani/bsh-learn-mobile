@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Alert, Linking, ActivityIndicator, Dimensions,
+  Alert, Linking, ActivityIndicator, Dimensions,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,7 +56,7 @@ const PROGRAMS: Record<string, ProgramDetail> = {
     badges: [
       { label: "20 Premium Tools", icon: "🧰", color: "#d97706" },
       { label: "Lifetime Access",  icon: "♾",  color: "#22c55e" },
-      { label: "Instant Unlock",   icon: "⚡",  color: "#7c3aed" },
+      { label: "Instant Unlock",   icon: "⚡",  color: "#0c2461" },
     ],
     description: "Unlock all 20 expert-crafted healing tools — guided hypnosis sessions, sleep meditations, brainwave audios, breathing exercises, and focus timers. One payment, lifetime access, no subscriptions.",
     topics: [
@@ -87,7 +88,7 @@ const PROGRAMS: Record<string, ProgramDetail> = {
     badges: [
       { label: "Best Seller",       icon: "🏆", color: "#f59e0b" },
       { label: "Certified Program", icon: "✦",  color: "#22c55e" },
-      { label: "Live + Virtual",    icon: "⚡",  color: "#7c3aed" },
+      { label: "Live + Virtual",    icon: "⚡",  color: "#0c2461" },
     ],
     description: "Master 7 hypnosis modalities — from self-hypnosis to Ericksonian techniques — through live Zoom sessions, weekend batches, and a vibrant practice community.",
     topics: ["Self Hypnosis", "Hetero Hypnosis", "Street Hypnosis", "Instant Hypnosis", "Stage Hypnosis", "Ericksonian Hypnosis", "Non-Verbal Hypnosis"],
@@ -98,7 +99,7 @@ const PROGRAMS: Record<string, ProgramDetail> = {
       { icon: "🧠", value: "25+",         label: "Modalities" },
     ],
     img: advHypnosisImg,
-    accentColor: "#7c3aed",
+    accentColor: "#0c2461",
     certificationLabel: "CERTIFICATION",
     certificationTitle: "Advanced Diploma in Clinical Hypnotherapy",
     programId: "advance-hypnosis",
@@ -123,8 +124,8 @@ const PROGRAMS: Record<string, ProgramDetail> = {
     subtitle: "Live Subscription Programme",
     badges: [
       { label: "Live Subscription",     icon: "🔴", color: "#ef4444" },
-      { label: "40+ Classes / Month",   icon: "📅", color: "#7c3aed" },
-      { label: "Full Archive Access",   icon: "🗂",  color: "#0d9488" },
+      { label: "40+ Classes / Month",   icon: "📅", color: "#0c2461" },
+      { label: "Full Archive Access",   icon: "🗂",  color: "#0c2461" },
     ],
     description: "India's most active hypnotherapy subscription — 40+ expert-led live classes every month, full past recordings library, and a hands-on practice community to turn you into a truly efficient practitioner.",
     topics: ["Self Hypnosis", "Ericksonian Hypnosis", "NLP Integration", "Past Life Regression", "Street Hypnosis", "Stage Hypnosis", "Non-Verbal Hypnosis", "Instant Induction", "Parts Therapy", "Inner Child Work", "Trauma Release", "Age Regression"],
@@ -135,7 +136,7 @@ const PROGRAMS: Record<string, ProgramDetail> = {
       { icon: "📜", value: "Monthly",  label: "Certificate" },
     ],
     img: hypnosis2Img,
-    accentColor: "#7c3aed",
+    accentColor: "#0c2461",
     programId: "hypnosis-2",
     isSubscription: true,
     educator: "Dr. Pradeep Kumar",
@@ -155,7 +156,7 @@ const PROGRAMS: Record<string, ProgramDetail> = {
       },
       {
         id: "quarterly", label: "3 MONTHS", pricePaise: 279900, originalPaise: 299700,
-        badge: "Most Popular", badgeColor: "#7c3aed",
+        badge: "Most Popular", badgeColor: "#0c2461",
         desc: "Build real practice depth with three months of continuous expert-led training.",
         features: ["40+ Live Classes / Month", "Full Past Recordings", "Practice Group Access", "Expert Q&A Sessions", "Monthly Certificate"],
       },
@@ -277,7 +278,7 @@ export default function ProgramDetailScreen() {
         description: prog.isSubscription ? `Hypnosis 2.0 — ${plan?.label ?? "1 Month"}` : prog.title,
         order_id: order.id,
         prefill: { name: user.name, email: user.email },
-        theme: { color: prog.accentColor ?? "#7c3aed" },
+        theme: { color: prog.accentColor ?? "#0c2461" },
       });
       await client.post("/payments/verify", {
         razorpayOrderId: paymentData.razorpay_order_id,
@@ -303,8 +304,8 @@ export default function ProgramDetailScreen() {
   if (hasAccess === null && !!user) {
     return (
       <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
-        <ActivityIndicator color="#7c3aed" size="large" />
-        <Text style={{ color: "#a78bfa", marginTop: 14, fontSize: 14 }}>Checking your access…</Text>
+        <ActivityIndicator color="#0c2461" size="large" />
+        <Text style={{ color: "#60a5fa", marginTop: 14, fontSize: 14 }}>Checking your access…</Text>
       </View>
     );
   }
@@ -384,7 +385,7 @@ export default function ProgramDetailScreen() {
 
   // ── Member Area ────────────────────────────────────────────────────────────
   if (hasAccess === true) {
-    const accent = prog.accentColor ?? "#7c3aed";
+    const accent = prog.accentColor ?? "#0c2461";
     const livePosts  = posts.filter(p => p.type === "live_class");
     const annPosts   = posts.filter(p => p.type === "announcement");
     const nextLive   = livePosts.find(p => p.scheduledAt && new Date(p.scheduledAt) > new Date());
@@ -579,7 +580,7 @@ export default function ProgramDetailScreen() {
 
           {/* Program image + cert card */}
           <View style={s.heroImgRow}>
-            <Image source={prog.img as any} style={s.heroImg} resizeMode="cover" />
+            <Image source={prog.img as any} style={s.heroImg} contentFit="cover" />
             {prog.certificationTitle && (
               <View style={s.certCard}>
                 <Text style={s.certLabel}>{prog.certificationLabel}</Text>
@@ -608,7 +609,7 @@ export default function ProgramDetailScreen() {
                 <Text style={s.heroPrice}>₹{Math.round((prog.pricePaise ?? 0) / 100).toLocaleString("en-IN")}</Text>
               </View>
               <TouchableOpacity
-                style={[s.joinBtn, { opacity: loading ? 0.7 : 1, backgroundColor: prog.accentColor ?? "#7c3aed" }]}
+                style={[s.joinBtn, { opacity: loading ? 0.7 : 1, backgroundColor: prog.accentColor ?? "#0c2461" }]}
                 onPress={() => handleJoin()} disabled={loading}>
                 {loading
                   ? <ActivityIndicator color="#fff" />
@@ -699,9 +700,9 @@ export default function ProgramDetailScreen() {
                         <Text style={s.planBadgeTxt}>⭐ {plan.badge}</Text>
                       </View>
                     )}
-                    <Text style={[s.planLabel, { color: selected ? "#7c3aed" : "#94a3b8" }]}>{plan.label}</Text>
+                    <Text style={[s.planLabel, { color: selected ? "#0c2461" : "#94a3b8" }]}>{plan.label}</Text>
                     <View style={s.planPriceRow}>
-                      <Text style={[s.planPrice, { color: selected ? "#7c3aed" : "#f1f5f9" }]}>₹{priceRs.toLocaleString("en-IN")}</Text>
+                      <Text style={[s.planPrice, { color: selected ? "#0c2461" : "#f1f5f9" }]}>₹{priceRs.toLocaleString("en-IN")}</Text>
                       <Text style={s.planPeriod}> / {plan.id === "monthly" ? "month" : plan.id === "quarterly" ? "3 months" : "6 months"}</Text>
                     </View>
                     {origRs && saveRs && (
@@ -720,12 +721,12 @@ export default function ProgramDetailScreen() {
                       </View>
                     ))}
                     <TouchableOpacity
-                      style={[s.planJoinBtn, selected ? { backgroundColor: "#7c3aed" } : { backgroundColor: "transparent", borderWidth: 1.5, borderColor: "#334155" }]}
+                      style={[s.planJoinBtn, selected ? { backgroundColor: "#0c2461" } : { backgroundColor: "transparent", borderWidth: 1.5, borderColor: "#334155" }]}
                       onPress={() => handleJoin(plan.id)}
                       disabled={loading}>
                       {loading && selected
-                        ? <ActivityIndicator color={selected ? "#fff" : "#7c3aed"} />
-                        : <Text style={[s.planJoinTxt, { color: selected ? "#fff" : "#7c3aed" }]}>Join Now →</Text>}
+                        ? <ActivityIndicator color={selected ? "#fff" : "#0c2461"} />
+                        : <Text style={[s.planJoinTxt, { color: selected ? "#fff" : "#0c2461" }]}>Join Now →</Text>}
                     </TouchableOpacity>
                   </TouchableOpacity>
                 );
@@ -747,7 +748,7 @@ export default function ProgramDetailScreen() {
 
         {/* ── Bottom CTA ── */}
         <View style={[s.section, { paddingBottom: 8 }]}>
-          <TouchableOpacity style={[s.bigJoinBtn, { backgroundColor: prog.accentColor ?? "#7c3aed" }]}
+          <TouchableOpacity style={[s.bigJoinBtn, { backgroundColor: prog.accentColor ?? "#0c2461" }]}
             onPress={() => handleJoin(prog.isSubscription ? selectedPlan : undefined)}
             disabled={loading}>
             {loading
@@ -775,7 +776,7 @@ const s = StyleSheet.create({
   hero: {
     backgroundColor: "#0f0a2e",
     paddingHorizontal: 20, paddingBottom: 28,
-    borderBottomWidth: 1, borderBottomColor: "#1e1b4b",
+    borderBottomWidth: 1, borderBottomColor: "#0f2557",
   },
   backBtn: {
     position: "absolute", left: 16, zIndex: 50,
@@ -783,7 +784,7 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center",
   },
   breadcrumb: { flexDirection: "row", alignItems: "center", marginBottom: 16, flexWrap: "wrap" },
-  breadcrumbLink: { color: "#7c3aed", fontSize: 12, fontWeight: "600" },
+  breadcrumbLink: { color: "#0c2461", fontSize: 12, fontWeight: "600" },
   breadcrumbSep: { color: "#4b5563", fontSize: 12 },
   breadcrumbCurrent: { color: "#9ca3af", fontSize: 12 },
 
@@ -810,10 +811,10 @@ const s = StyleSheet.create({
   heroImgRow: { marginBottom: 20 },
   heroImg: { width: "100%", height: 200, borderRadius: 16, marginBottom: 12 },
   certCard: {
-    backgroundColor: "rgba(124,58,237,0.15)", borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: "#7c3aed44",
+    backgroundColor: "rgba(30,58,138,0.15)", borderRadius: 12,
+    padding: 14, borderWidth: 1, borderColor: "#0c246144",
   },
-  certLabel: { color: "#a78bfa", fontSize: 10, fontWeight: "800", letterSpacing: 1.5, marginBottom: 4 },
+  certLabel: { color: "#60a5fa", fontSize: 10, fontWeight: "800", letterSpacing: 1.5, marginBottom: 4 },
   certTitle: { color: "#fff", fontSize: 14, fontWeight: "800" },
 
   statsLine: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 20 },
@@ -825,7 +826,7 @@ const s = StyleSheet.create({
   courseFeeLabel: { color: "#9ca3af", fontSize: 11, marginBottom: 2 },
   heroPrice: { color: "#fff", fontSize: 28, fontWeight: "900" },
   joinBtn: {
-    backgroundColor: "#7c3aed", borderRadius: 14,
+    backgroundColor: "#0c2461", borderRadius: 14,
     paddingHorizontal: 28, paddingVertical: 14,
     flexDirection: "row", alignItems: "center",
   },
@@ -837,16 +838,16 @@ const s = StyleSheet.create({
   },
   stripItem: { flex: 1, alignItems: "center" },
   stripIcon: { fontSize: 22, marginBottom: 4 },
-  stripVal: { color: "#1e1b4b", fontSize: 16, fontWeight: "900" },
+  stripVal: { color: "#0f2557", fontSize: 16, fontWeight: "900" },
   stripLbl: { color: "#6b7280", fontSize: 10, marginTop: 2 },
 
   section: { paddingHorizontal: 20, paddingTop: 28 },
   sectionLabelRow: { alignItems: "center", marginBottom: 12 },
   sectionLabelPill: {
-    backgroundColor: "#ede9fe", borderRadius: 20,
+    backgroundColor: "#eff6ff", borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 5,
   },
-  sectionLabelTxt: { color: "#7c3aed", fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
+  sectionLabelTxt: { color: "#0c2461", fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
   sectionTitle: { color: "#0f0a2e", fontSize: 24, fontWeight: "900", textAlign: "center", marginBottom: 8 },
   sectionSub: { color: "#6b7280", fontSize: 13, textAlign: "center", lineHeight: 20, marginBottom: 24 },
 
@@ -870,7 +871,7 @@ const s = StyleSheet.create({
     borderWidth: 2, borderColor: "#e5e7eb", position: "relative",
     shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
   },
-  planCardSelected: { borderColor: "#7c3aed" },
+  planCardSelected: { borderColor: "#0c2461" },
   planBadge: {
     position: "absolute", top: -12, alignSelf: "center",
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5,
@@ -893,17 +894,17 @@ const s = StyleSheet.create({
     paddingBottom: 24, borderTopWidth: 1, borderTopColor: "#e5e7eb",
     marginTop: 28,
   },
-  eduLabel: { color: "#7c3aed", fontSize: 10, fontWeight: "800", letterSpacing: 1.5, marginBottom: 6 },
+  eduLabel: { color: "#0c2461", fontSize: 10, fontWeight: "800", letterSpacing: 1.5, marginBottom: 6 },
   eduName: { color: "#0f0a2e", fontSize: 22, fontWeight: "900", marginBottom: 2 },
-  eduRole: { color: "#7c3aed", fontSize: 13, fontWeight: "600", marginBottom: 8 },
+  eduRole: { color: "#0c2461", fontSize: 13, fontWeight: "600", marginBottom: 8 },
   eduDesc: { color: "#6b7280", fontSize: 13, lineHeight: 20, marginBottom: 12 },
   eduProfileBtn: {},
-  eduProfileTxt: { color: "#7c3aed", fontSize: 13, fontWeight: "700" },
+  eduProfileTxt: { color: "#0c2461", fontSize: 13, fontWeight: "700" },
 
   bigJoinBtn: {
-    backgroundColor: "#7c3aed", borderRadius: 16, paddingVertical: 16,
+    backgroundColor: "#0c2461", borderRadius: 16, paddingVertical: 16,
     alignItems: "center",
-    shadowColor: "#7c3aed", shadowOpacity: 0.4, shadowRadius: 14, elevation: 8,
+    shadowColor: "#0c2461", shadowOpacity: 0.4, shadowRadius: 14, elevation: 8,
   },
   bigJoinTxt: { color: "#fff", fontSize: 16, fontWeight: "900" },
   consultLink: { alignItems: "center", paddingVertical: 14 },
@@ -928,7 +929,7 @@ const s = StyleSheet.create({
     flexDirection: "row", alignItems: "flex-start", gap: 12,
     backgroundColor: "#0f0a2e", borderRadius: 14, padding: 16,
     marginTop: 16, marginBottom: 14,
-    borderWidth: 1, borderColor: "#1e1b4b",
+    borderWidth: 1, borderColor: "#0f2557",
   },
   memberAreaTitle: { color: "#f1f5f9", fontWeight: "900", fontSize: 17, marginBottom: 3 },
   memberAreaSub: { color: "#64748b", fontSize: 12, lineHeight: 18 },
@@ -936,7 +937,7 @@ const s = StyleSheet.create({
   statCard: {
     flex: 1, backgroundColor: "#0f0a2e", borderRadius: 12,
     padding: 12, alignItems: "center",
-    borderWidth: 1, borderColor: "#1e1b4b",
+    borderWidth: 1, borderColor: "#0f2557",
   },
   statVal: { fontSize: 22, fontWeight: "900", marginBottom: 2 },
   statLbl: { color: "#64748b", fontSize: 11 },
@@ -963,7 +964,7 @@ const s = StyleSheet.create({
   emptySub: { color: "#64748b", fontSize: 13 },
   postCard: {
     backgroundColor: "#0f0a2e", borderRadius: 14, padding: 16,
-    marginBottom: 12, borderWidth: 1, borderColor: "#1e1b4b",
+    marginBottom: 12, borderWidth: 1, borderColor: "#0f2557",
   },
   postDate: { fontSize: 13, fontWeight: "700", marginBottom: 6 },
   postTitle: { color: "#f1f5f9", fontSize: 15, fontWeight: "800", marginBottom: 6 },
@@ -994,7 +995,7 @@ const ht = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: "#0f0a2e", borderRadius: 12, padding: 14,
     borderLeftWidth: 3, marginBottom: 10,
-    borderWidth: 1, borderColor: "#1e1b4b",
+    borderWidth: 1, borderColor: "#0f2557",
   },
   catLabel: { color: "#f1f5f9", fontSize: 14, fontWeight: "700" },
   catCountBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
