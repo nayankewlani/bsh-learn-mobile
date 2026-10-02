@@ -638,9 +638,8 @@ export default function ConsultationScreen() {
   const handleCategoryPress = useCallback((slug: string) => {
     const next = selectedCategory === slug ? null : slug;
     setSelectedCategory(next);
-    // Scroll to expert list section
-    setTimeout(() => flatListRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: HEADER_H + 8 }), 50);
-  }, [selectedCategory, HEADER_H]);
+    setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+  }, [selectedCategory]);
 
   const renderItem = useCallback(({ item }: { item: Expert }) => (
     <ExpertCard key={item._id} expert={item} t={t} isDark={isDark}
