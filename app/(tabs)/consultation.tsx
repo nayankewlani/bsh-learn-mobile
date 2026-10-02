@@ -494,6 +494,7 @@ export default function ConsultationScreen() {
   const [applying, setApplying]       = useState<Expert | null>(null);
   const [chatting, setChatting]       = useState<Expert | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const filteredLengthRef = useRef(0);
 
   useEffect(() => {
     Animated.loop(
@@ -595,6 +596,8 @@ export default function ConsultationScreen() {
     });
   }, [experts, searchQuery, filterLangs, onlineOnly, selectedCategory]);
 
+  useEffect(() => { filteredLengthRef.current = filtered.length; }, [filtered]);
+
   const onlineCount = experts.filter(e => e.isOnline).length;
   const filterCount = filterLangs.length + (onlineOnly ? 1 : 0);
 
@@ -638,8 +641,14 @@ export default function ConsultationScreen() {
   const handleCategoryPress = useCallback((slug: string) => {
     const next = selectedCategory === slug ? null : slug;
     setSelectedCategory(next);
-    setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
-  }, [selectedCategory]);
+    setTimeout(() => {
+      if (filteredLengthRef.current > 0) {
+        flatListRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: HEADER_H + 8 });
+      } else {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }
+    }, 100);
+  }, [selectedCategory, HEADER_H]);
 
   const renderItem = useCallback(({ item }: { item: Expert }) => (
     <ExpertCard key={item._id} expert={item} t={t} isDark={isDark}
