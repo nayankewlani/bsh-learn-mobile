@@ -12,7 +12,7 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease --stacktrace"
+        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
