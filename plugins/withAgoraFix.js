@@ -308,7 +308,8 @@ module.exports = function withNativeCompatFixes(config) {
   config = withAndroidManifest(config, (cfg) => {
     const application = cfg.modResults.manifest.application[0];
     application.$["android:largeHeap"] = "true";
-    console.log("[compat] ✓ set android:largeHeap=true");
+    application.$["android:usesCleartextTraffic"] = "true";
+    console.log("[compat] ✓ set android:largeHeap=true + android:usesCleartextTraffic=true");
     return cfg;
   });
 

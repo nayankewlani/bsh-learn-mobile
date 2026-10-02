@@ -34,7 +34,6 @@
       },
       "package": "com.bshlearn.app",
       "googleServicesFile": "./google-services.json",
-      "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.CAMERA",
