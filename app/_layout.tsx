@@ -11,6 +11,10 @@ import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import { loadTokenFromStore, setMemoryToken } from "../api/client";
 import { restoreCredential } from "../lib/restoreCredentials";
+import { initErrorTracking } from "../services/errorService";
+
+// Boot crash tracking before anything else — catches all global errors and unhandled rejections
+initErrorTracking();
 
 // Suppress expo-notifications Expo Go warning (harmless, but shows as red overlay)
 LogBox.ignoreLogs([
@@ -18,7 +22,7 @@ LogBox.ignoreLogs([
   "expo-notifications",
 ]);
 
-export default function RootLayout() {
+function RootLayout() {
   const { loadUser, user } = useAuthStore();
   const [showSplash, setShowSplash] = useState(true);
   // true in dev (skip OTA), false in prod until OTA check settles
@@ -102,7 +106,7 @@ export default function RootLayout() {
     import("../services/notificationService").then(async (mod) => {
       await mod.requestNotificationPermission();
       await mod.registerDeviceToken();
-    });
+    }).catch(() => {});
 
     // Load token into memory cache; if none found, attempt zero-tap restore after reinstall/device transfer.
     (async () => {
@@ -137,7 +141,7 @@ export default function RootLayout() {
     import("../services/notificationService").then((mod) => {
       console.warn  = origWarn;
       console.error = origError;
-      notifCleanup.current = mod.setupNotificationListeners(
+      try { notifCleanup.current = mod.setupNotificationListeners(
         undefined,
         (response) => {
           const data = response.notification.request.content.data as {
@@ -195,8 +199,8 @@ export default function RootLayout() {
 
           router.push({ pathname: destPathname as any, params: destParams });
         }
-      );
-    });
+      ); } catch {}
+    }).catch(() => { console.warn = origWarn; console.error = origError; });
     return () => notifCleanup.current?.();
   }, []);
 
@@ -204,7 +208,7 @@ export default function RootLayout() {
     if (!user) return;
     import("../services/notificationService").then((mod) =>
       mod.registerPushToken()
-    );
+    ).catch(() => {});
   }, [user]);
 
   return (
@@ -232,3 +236,5 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+export default RootLayout;

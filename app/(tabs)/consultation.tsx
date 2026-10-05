@@ -495,6 +495,7 @@ export default function ConsultationScreen() {
   const [chatting, setChatting]       = useState<Expert | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const filteredLengthRef = useRef(0);
+  const categoryGridHeightRef = useRef(0);
 
   useEffect(() => {
     Animated.loop(
@@ -641,14 +642,15 @@ export default function ConsultationScreen() {
   const handleCategoryPress = useCallback((slug: string) => {
     const next = selectedCategory === slug ? null : slug;
     setSelectedCategory(next);
-    setTimeout(() => {
-      if (filteredLengthRef.current > 0) {
-        flatListRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: HEADER_H + 8 });
-      } else {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-      }
-    }, 100);
-  }, [selectedCategory, HEADER_H]);
+    if (next !== null) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({
+          offset: categoryGridHeightRef.current,
+          animated: true,
+        });
+      }, 150);
+    }
+  }, [selectedCategory]);
 
   const renderItem = useCallback(({ item }: { item: Expert }) => (
     <ExpertCard key={item._id} expert={item} t={t} isDark={isDark}
@@ -662,7 +664,7 @@ export default function ConsultationScreen() {
   const listHeader = useMemo(() => (
     <>
       {/* ── Explore Healing Support ── */}
-      <View style={s.exploreSec}>
+      <View style={s.exploreSec} onLayout={e => { categoryGridHeightRef.current = e.nativeEvent.layout.height; }}>
         <View style={s.exploreHeader}>
           <View>
             <Text style={[s.exploreTitle, { color: t.text }]}>
