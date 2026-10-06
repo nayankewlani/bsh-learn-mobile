@@ -162,7 +162,7 @@ function RootLayout() {
           let destPathname: string | null = null;
           let destParams: Record<string, string> = {};
 
-          if (data?.type === "live_session_started" && data.classId) {
+          if ((data?.type === "live_session_started" || data?.type === "live_class_started") && data.classId) {
             destPathname = "/live-room";
             destParams   = { classId: data.classId };
           } else if (data?.type === "session_scheduled") {
