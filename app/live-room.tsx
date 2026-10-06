@@ -140,11 +140,13 @@ export default function LiveRoomScreen() {
 
   useEffect(() => { panelRef.current = activePanel; }, [activePanel]);
 
-  // If the pinned participant leaves the call, fall back to the default layout
-  // instead of leaving the main tile pointed at a uid that no longer exists.
+  // If the pinned participant leaves the call, fall back to the default layout.
+  // Also auto-recover: if audience somehow pinned "local" but remotes are available,
+  // reset so the host video fills the main tile again.
   useEffect(() => {
     if (mainId !== null && mainId !== "local" && !remoteUids.includes(mainId)) setMainId(null);
-  }, [remoteUids, mainId]);
+    if (mainId === "local" && !canPublish && remoteUids.length > 0) setMainId(null);
+  }, [remoteUids, mainId, canPublish]);
 
   /* ── initial connect ──────────────────────────────────────────────────── */
   useEffect(() => {
@@ -167,12 +169,13 @@ export default function LiveRoomScreen() {
       getEngine(conn.appId);
       attachHandlers({
         onJoined: (uid) => {
+          if (cancelled) return;
           if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
           setLocalUid(uid); setPhase("joined");
         },
-        onUserJoined: (uid) => setRemoteUids(prev => prev.includes(uid) ? prev : [...prev, uid]),
-        onUserOffline: (uid) => setRemoteUids(prev => prev.filter(u => u !== uid)),
-        onNetworkQuality: (q) => setNetworkQuality(q),
+        onUserJoined: (uid) => { if (!cancelled) setRemoteUids(prev => prev.includes(uid) ? prev : [...prev, uid]); },
+        onUserOffline: (uid) => { if (!cancelled) setRemoteUids(prev => prev.filter(u => u !== uid)); },
+        onNetworkQuality: (q) => { if (!cancelled) setNetworkQuality(q); },
         onError: (msg) => { if (cancelled) return; setErrorMsg(msg); setPhase("error"); },
       });
       joinChannel(conn.channel, conn.token, agoraRole, conn.uid ?? 0);
@@ -262,7 +265,7 @@ export default function LiveRoomScreen() {
       // Class was ended by the host — kick all participants out immediately.
       if (data.status === 'ended') {
         destroyEngine();
-        router.back();
+        try { router.back(); } catch {}
         return;
       }
 
@@ -715,7 +718,7 @@ export default function LiveRoomScreen() {
             </View>
           )
         ) : (
-          <TouchableOpacity activeOpacity={0.9} style={st.tile} onPress={() => setMainId("local")}>
+          <TouchableOpacity activeOpacity={canPublish ? 0.9 : 1} style={st.tile} onPress={() => canPublish && setMainId("local")}>
             <RtcSurfaceView canvas={{ uid: effectiveMainId }} style={StyleSheet.absoluteFill} />
             <Text style={st.tileLabel}>{inBreakout ? "Participant" : nameForUid(effectiveMainId)}{mutedUserUids.includes(effectiveMainId) ? " 🔇" : ""}</Text>
           </TouchableOpacity>
