@@ -30,6 +30,8 @@ function RootLayout() {
   const [splashAnimDone, setSplashAnimDone] = useState(false);
   // Track cleanup fn from notification listener
   const notifCleanup = useRef<(() => void) | undefined>(undefined);
+  // Prevents cold-start notification from being handled twice
+  const coldStartHandledRef = useRef(false);
 
   // OTA update — runs during the 3s splash animation window.
   // If download finishes within 5s: reloadAsync() fires while splash is still
@@ -138,12 +140,11 @@ function RootLayout() {
     console.warn  = suppress;
     console.error = suppressErr;
 
-    import("../services/notificationService").then((mod) => {
+    import("../services/notificationService").then(async (mod) => {
       console.warn  = origWarn;
       console.error = origError;
-      try { notifCleanup.current = mod.setupNotificationListeners(
-        undefined,
-        (response) => {
+
+      const handleResponse = (response: any) => {
           const data = response.notification.request.content.data as {
             type?:         string;
             deepLinkType?: string;
@@ -198,8 +199,24 @@ function RootLayout() {
           }
 
           router.push({ pathname: destPathname as any, params: destParams });
-        }
-      ); } catch {}
+      };
+
+      try { notifCleanup.current = mod.setupNotificationListeners(undefined, handleResponse); } catch {}
+
+      // Cold-start: app was killed, user tapped a notification to open it.
+      // addNotificationResponseReceivedListener won't fire in this case because the
+      // listener isn't registered until after the tap — getLastNotificationResponseAsync
+      // is the only way to retrieve that initial tap response.
+      if (!coldStartHandledRef.current) {
+        coldStartHandledRef.current = true;
+        try {
+          const lastResponse = await mod.getLastNotificationResponse();
+          // Skip stale notifications from previous sessions (older than 5 minutes)
+          if (lastResponse && (Date.now() - lastResponse.notification.date) < 5 * 60 * 1000) {
+            handleResponse(lastResponse);
+          }
+        } catch {}
+      }
     }).catch(() => { console.warn = origWarn; console.error = origError; });
     return () => notifCleanup.current?.();
   }, []);

@@ -89,6 +89,10 @@ export async function trackNotificationOpened(broadcastId: string): Promise<void
   } catch {}
 }
 
+export async function getLastNotificationResponse(): Promise<Notifications.NotificationResponse | null> {
+  return Notifications.getLastNotificationResponseAsync();
+}
+
 export function setupNotificationListeners(
   onNotification?: (n: Notifications.Notification) => void,
   onResponse?: (r: Notifications.NotificationResponse) => void,
