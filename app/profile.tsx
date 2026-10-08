@@ -1,7 +1,8 @@
 // ── Profile — View & Edit Account ────────────────────────────────────────────
 import React, { useState } from "react";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
+  View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -44,6 +45,7 @@ export default function ProfileScreen() {
 
   const [editing, setEditing]   = useState(false);
   const [saving, setSaving]     = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
     name:   user?.name   || "",
     phone:  user?.phone  || "",
@@ -102,6 +104,45 @@ export default function ProfileScreen() {
     } finally { setEmailLoading(false); }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all your data. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete My Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Are you absolutely sure?",
+              "Type confirmation: your account will be deleted immediately.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Yes, Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    setDeleting(true);
+                    try {
+                      await client.delete("/auth/account");
+                      logout();
+                      router.replace("/(auth)/login");
+                    } catch {
+                      Alert.alert("Error", "Failed to delete account. Please try again.");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   if (!user) return null;
 
   const fmtDob = (d?: string) =>
@@ -122,7 +163,7 @@ export default function ProfileScreen() {
         }
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+      <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} enableOnAndroid>
 
         {/* Avatar & name row */}
         <View style={s.avatarRow}>
@@ -220,6 +261,18 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* Delete Account */}
+        <TouchableOpacity style={[s.btn, { backgroundColor: "rgba(239,68,68,0.06)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", marginTop: 8 }]}
+          onPress={handleDeleteAccount} disabled={deleting} activeOpacity={0.8}>
+          {deleting
+            ? <ActivityIndicator color={C.red} />
+            : <>
+                <Ionicons name="trash-outline" size={16} color={C.red} style={{ marginRight: 8 }} />
+                <Text style={[s.btnTxt, { color: C.red }]}>Delete Account</Text>
+              </>
+          }
+        </TouchableOpacity>
+
         {/* Logout */}
         <TouchableOpacity style={[s.btn, { backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)", marginTop: 8 }]}
           onPress={() => Alert.alert("Log Out", "Are you sure?", [
@@ -230,7 +283,7 @@ export default function ProfileScreen() {
           <Text style={[s.btnTxt, { color: C.red }]}>Log Out</Text>
         </TouchableOpacity>
 
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

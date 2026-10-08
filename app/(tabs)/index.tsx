@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Modal, Animated, Easing, TextInput, ActivityIndicator,
   NativeSyntheticEvent, NativeScrollEvent, Alert, Linking, Switch,
-  InteractionManager,
+  InteractionManager, Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,7 +13,6 @@ import { useThemeStore } from "../../stores/themeStore";
 import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
 import { RAZORPAY_KEY_ID, API_URL } from "../../constants";
 import client from "../../api/client";
-import { blockIOSPurchase } from "../../lib/paymentGate";
 import { purchaseCourse, purchaseProgram } from "../../services/purchaseService";
 import { useHomeStore } from "../../stores/homeStore";
 
@@ -898,11 +897,30 @@ export default function HomeScreen() {
         [{ text:"Log In", onPress:()=>router.push("/(auth)/login") }, { text:"Cancel", style:"cancel" }]);
       return;
     }
-    if (blockIOSPurchase()) return;
+    if (plusLoading) return;
+
+    // iOS — route through Apple In-App Purchase (guideline 3.1.1)
+    if (Platform.OS === "ios") {
+      setPlusLoading(true);
+      try {
+        const result = await purchaseProgram({
+          programId: "bsh_plus",
+          title:     "BSH Plus — 12 Months Unlimited Access",
+          pricePaise: 99900,
+          userName:  user.name,
+          userEmail: user.email,
+        });
+        if (result.success) {
+          Alert.alert("Welcome to BSH Plus! 🎉", "Unlimited access for 12 months.",
+            [{ text: "Start Learning", onPress: () => router.push("/(tabs)/explore") }]);
+        }
+      } finally { setPlusLoading(false); }
+      return;
+    }
+
     if (!RazorpayCheckout) {
       Alert.alert("Payment Not Available","Payments require the full BSH app build."); return;
     }
-    if (plusLoading) return;
     setPlusLoading(true);
     try {
       const { data } = await client.post("/payments/create-order", { type:"subscription", plan:"bsh_plus" });

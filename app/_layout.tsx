@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Linking, LogBox } from "react-native";
+import { Alert, Linking, LogBox, Platform } from "react-native";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useAuthStore } from "../stores/authStore";
@@ -83,7 +83,7 @@ function RootLayout() {
         const currentVersion = Constants.expoConfig?.version ?? "0.0.0";
         const r = await fetch(`${API_URL}/auth/app-version`);
         if (!r.ok) return;
-        const { latestVersion, playStoreUrl } = await r.json();
+        const { latestVersion, playStoreUrl, appStoreUrl } = await r.json();
         const isNewer = (latest: string, current: string) => {
           const [lM,lN,lP] = latest.split(".").map(Number);
           const [cM,cN,cP] = current.split(".").map(Number);
@@ -92,12 +92,14 @@ function RootLayout() {
           return (lP ?? 0) > (cP ?? 0);
         };
         if (isNewer(latestVersion, currentVersion)) {
+          const storeUrl  = Platform.OS === "ios" ? appStoreUrl : playStoreUrl;
+          const storeName = Platform.OS === "ios" ? "App Store" : "Play Store";
           Alert.alert(
             "Update Available",
-            `A new version (${latestVersion}) of BSH Healers is available on the Play Store. Update now for the latest features.`,
+            `A new version (${latestVersion}) of BSH Healers is available on the ${storeName}. Update now for the latest features.`,
             [
               { text: "Later", style: "cancel" },
-              { text: "Update Now", onPress: () => Linking.openURL(playStoreUrl) },
+              { text: "Update Now", onPress: () => Linking.openURL(storeUrl) },
             ]
           );
         }

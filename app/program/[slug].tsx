@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Linking, ActivityIndicator, Dimensions,
+  Alert, Linking, ActivityIndicator, Dimensions, Platform,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../stores/authStore";
 import { RAZORPAY_KEY_ID } from "../../constants";
 import client from "../../api/client";
-import { blockIOSPurchase } from "../../lib/paymentGate";
+import { purchaseProgram } from "../../services/purchaseService";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -241,7 +241,6 @@ export default function ProgramDetailScreen() {
   }, [prog.programId]);
 
   const handleJoin = async (planId?: string) => {
-    if (blockIOSPurchase()) return;
     if (prog.programId === "hypnosis-2") {
       Linking.openURL("https://lp.blessingsschoolofhypnosis.com/home--blessings-school-of-hypnosis").catch(() => {});
       return;
@@ -251,18 +250,45 @@ export default function ProgramDetailScreen() {
         [{ text: "Log In", onPress: () => router.push("/(auth)/login") }, { text: "Cancel", style: "cancel" }]);
       return;
     }
+    if (loading) return;
+
+    const plan = prog.plans?.find(p => p.id === (planId ?? selectedPlan));
+    const pricePaise = prog.isSubscription
+      ? (plan?.pricePaise ?? prog.plans?.[0].pricePaise ?? 99900)
+      : (prog.pricePaise ?? 2999900);
+
+    // iOS — route through Apple In-App Purchase (guideline 3.1.1)
+    if (Platform.OS === "ios") {
+      setLoading(true);
+      try {
+        const result = await purchaseProgram({
+          programId:    prog.programId,
+          title:        prog.title,
+          pricePaise,
+          userName:     user.name,
+          userEmail:    user.email,
+        });
+        if (result.success) {
+          setHasAccess(true);
+          if (prog.programId === "healing-tools") {
+            Alert.alert("Unlocked! 🎉", "All 20 Healing Tools are now available.",
+              [{ text: "Open Tools", onPress: () => router.push("/(tabs)" as any) }]);
+          } else {
+            Alert.alert("Welcome! 🎉", `You now have full access to ${prog.title}.`,
+              [{ text: "Start Learning", onPress: () => router.push("/(tabs)/explore") }]);
+          }
+        }
+      } finally { setLoading(false); }
+      return;
+    }
+
     if (apiRzpLink) { Linking.openURL(apiRzpLink).catch(() => {}); return; }
     if (!RazorpayCheckout) {
       Alert.alert("Payment Not Available", "Payments require the full BSH app build. Please use our website to purchase.");
       return;
     }
-    if (loading) return;
     setLoading(true);
     try {
-      const plan = prog.plans?.find(p => p.id === (planId ?? selectedPlan));
-      const pricePaise = prog.isSubscription
-        ? (plan?.pricePaise ?? prog.plans?.[0].pricePaise ?? 99900)
-        : (prog.pricePaise ?? 2999900);
 
       const { data } = await client.post("/payments/create-order", {
         type: prog.isSubscription ? "subscription" : "program",

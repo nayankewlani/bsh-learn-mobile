@@ -21,7 +21,11 @@
         "NSPhotoLibraryUsageDescription": "BSH Healers needs access to your photo library so you can upload a profile picture or attach images.",
         "NSPhotoLibraryAddUsageDescription": "BSH Healers needs permission to save images to your photo library.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification"]
+        "UIBackgroundModes": [
+          "voip",
+          "fetch",
+          "remote-notification"
+        ]
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -79,7 +83,8 @@
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "newArchEnabled": false,
     "experiments": {
