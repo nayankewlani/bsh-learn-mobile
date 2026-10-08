@@ -26,6 +26,9 @@ export const IAP_TIERS: IapTier[] = [
   { productId: "com.bshlearn.app.tier13", pricePaise: 999_900 },   // ₹9,999
   { productId: "com.bshlearn.app.tier14", pricePaise: 1_499_900 }, // ₹14,999
   { productId: "com.bshlearn.app.tier15", pricePaise: 2_499_900 }, // ₹24,999
+  { productId: "com.bshlearn.app.tier16", pricePaise: 2_999_900 }, // ₹29,999
+  { productId: "com.bshlearn.app.tier17", pricePaise: 279_900 },  // ₹2,799
+  { productId: "com.bshlearn.app.tier18", pricePaise: 539_900 },  // ₹5,399
 ];
 
 export function nearestTierProductId(pricePaise: number): string {

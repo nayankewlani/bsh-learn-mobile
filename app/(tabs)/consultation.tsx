@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore, User } from "../../stores/authStore";
 import { useThemeStore, ThemeColors } from "../../stores/themeStore";
@@ -481,6 +481,7 @@ export default function ConsultationScreen() {
   const headerHiddenRef = useRef(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  const { trainerId: focusTrainerId } = useLocalSearchParams<{ trainerId?: string }>();
   const [experts, setExperts]         = useState<Expert[]>([]);
   const [categories, setCategories]   = useState<Category[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -598,6 +599,15 @@ export default function ConsultationScreen() {
   }, [experts, searchQuery, filterLangs, onlineOnly, selectedCategory]);
 
   useEffect(() => { filteredLengthRef.current = filtered.length; }, [filtered]);
+
+  useEffect(() => {
+    if (!focusTrainerId || filtered.length === 0) return;
+    const idx = filtered.findIndex(e => e._id === focusTrainerId);
+    if (idx < 0) return;
+    setTimeout(() => {
+      try { flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0 }); } catch {}
+    }, 400);
+  }, [focusTrainerId, filtered]);
 
   const onlineCount = experts.filter(e => e.isOnline).length;
   const filterCount = filterLangs.length + (onlineOnly ? 1 : 0);

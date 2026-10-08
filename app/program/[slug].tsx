@@ -241,7 +241,7 @@ export default function ProgramDetailScreen() {
   }, [prog.programId]);
 
   const handleJoin = async (planId?: string) => {
-    if (prog.programId === "hypnosis-2") {
+    if (prog.programId === "hypnosis-2" && Platform.OS !== "ios") {
       Linking.openURL("https://lp.blessingsschoolofhypnosis.com/home--blessings-school-of-hypnosis").catch(() => {});
       return;
     }

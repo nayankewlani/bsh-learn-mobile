@@ -1,6 +1,7 @@
 ﻿import React, { useState } from "react";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   TextInput, ActivityIndicator, Alert, Platform, Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,6 +11,7 @@ import { useAuthStore } from "../stores/authStore";
 import { useThemeStore } from "../stores/themeStore";
 import { RAZORPAY_KEY_ID } from "../constants";
 import client from "../api/client";
+import { purchaseConsultation } from "../services/purchaseService";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -54,15 +56,20 @@ export default function BookSessionScreen() {
     setError(""); setPaying(true);
     try {
       if (Platform.OS === "ios") {
-        // iOS: native Razorpay SDK not available on App Store builds.
-        // Create a hosted payment link and open it in Safari.
-        // The server webhook (payment_link.paid) marks the booking paid once Razorpay confirms.
-        const { data } = await client.post("/consultation-bookings/initiate-link", {
-          trainerName: params.expertName, trainerId: params.expertId,
-          sessions, durationMins: duration, clientNote, preferredTime,
+        const result = await purchaseConsultation({
+          trainerId:    params.expertId,
+          trainerName:  params.expertName,
+          sessions,
+          durationMins: duration,
+          bonusSessions,
+          totalPaise,
+          ratePerMin,
+          clientNote,
+          preferredTime,
+          userName:  user.name,
+          userEmail: user.email,
         });
-        await Linking.openURL(data.paymentUrl);
-        setBooked(true); // show confirmation UI; webhook handles actual fulfillment
+        if (result.success) setBooked(true);
       } else {
         // Android: native Razorpay SDK flow — stays in-app and returns payment IDs synchronously.
         if (!RazorpayCheckout) {
@@ -102,10 +109,7 @@ export default function BookSessionScreen() {
           <Text style={{ fontSize:56, marginBottom:14, textAlign:"center" }}>🎉</Text>
           <Text style={[s.doneTitle, { color:t.text }]}>Sessions Booked!</Text>
           <Text style={[s.doneTxt, { color:t.textMuted }]}>
-            {Platform.OS === "ios"
-              ? <>Complete your payment in the browser. Once paid, <Text style={{ fontWeight:"800", color:t.text }}>{params.expertName}</Text> will be notified automatically.</>
-              : <>Payment confirmed! <Text style={{ fontWeight:"800", color:t.text }}>{params.expertName}</Text> has been notified.</>
-            }
+            Payment confirmed! <Text style={{ fontWeight:"800", color:t.text }}>{params.expertName}</Text> has been notified.
           </Text>
           <Text style={[s.doneTxt, { color:t.textMuted }]}>
             You've booked <Text style={{ fontWeight:"800", color:t.text }}>{sessions} session{sessions > 1 ? "s" : ""}</Text>
@@ -128,7 +132,7 @@ export default function BookSessionScreen() {
 
   return (
     <View style={[s.root, { backgroundColor:t.bg }]}>
-      <ScrollView contentContainerStyle={{ paddingTop:insets.top + 16, paddingBottom:40, paddingHorizontal:16 }}>
+      <KeyboardAwareScrollView contentContainerStyle={{ paddingTop:insets.top + 16, paddingBottom:40, paddingHorizontal:16 }} enableOnAndroid>
         <TouchableOpacity onPress={() => router.back()} style={s.backRow}>
           <Ionicons name="arrow-back" size={18} color={t.textMuted} />
           <Text style={{ color:t.textMuted, marginLeft:6, fontSize:14 }}>Back</Text>
@@ -240,7 +244,7 @@ export default function BookSessionScreen() {
         <Text style={{ textAlign:"center", color:t.textMuted, fontSize:12, marginTop:12 }}>
           Secured by Razorpay · Trainer will schedule sessions after payment
         </Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

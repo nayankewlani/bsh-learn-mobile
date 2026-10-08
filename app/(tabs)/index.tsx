@@ -1383,7 +1383,7 @@ export default function HomeScreen() {
               const initials = trainerInitials(tr.name);
               return (
                 <TouchableOpacity activeOpacity={0.85}
-                  onPress={() => router.push("/(tabs)/consultation" as any)}
+                  onPress={() => router.push({ pathname: "/(tabs)/consultation" as any, params: { trainerId: api?._id || tr._id } })}
                   style={s.trainerCard}>
                   {LOCAL_IMGS_HOME[tr.name.toLowerCase()]
                     ? <Image source={LOCAL_IMGS_HOME[tr.name.toLowerCase()]} style={StyleSheet.absoluteFillObject} contentFit="cover" />
@@ -1430,7 +1430,7 @@ export default function HomeScreen() {
                     )}
                     <TouchableOpacity
                       style={{backgroundColor:"rgba(255,255,255,0.16)",borderRadius:8,paddingVertical:5,alignItems:"center",borderWidth:1,borderColor:"rgba(255,255,255,0.28)"}}
-                      onPress={() => router.push("/(tabs)/consultation" as any)}>
+                      onPress={() => router.push({ pathname: "/(tabs)/consultation" as any, params: { trainerId: api?._id || tr._id } })}>
                       <Text style={{color:"#fff",fontSize:10,fontWeight:"700"}}>Book Now →</Text>
                     </TouchableOpacity>
                   </View>

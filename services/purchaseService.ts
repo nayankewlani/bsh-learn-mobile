@@ -16,7 +16,7 @@ const RazorpayCheckout: {
 
 export interface PurchaseResult { success: boolean; cancelled?: boolean }
 
-type ContentType = "course" | "program";
+type ContentType = "course" | "program" | "consultation";
 
 // Access itself is tied to the user's account (Enrollment/ProgramAccess are
 // keyed by userId, not device), so a reinstall + re-login already restores
@@ -46,6 +46,7 @@ async function ensureIAPReady(): Promise<boolean> {
   try {
     RNIap.setup({ storekitMode: "STOREKIT2_MODE" });
     await RNIap.initConnection();
+    await RNIap.getProducts({ skus: ALL_IAP_SKUS });
     iapReady = true;
     return true;
   } catch (err) {
@@ -60,7 +61,7 @@ async function ensureIAPReady(): Promise<boolean> {
  * See API-server/src/config/iapTiers.ts for why purchases round to a tier
  * instead of a product being created per course.
  */
-async function purchaseIOS(contentType: ContentType, contentId: string, pricePaise: number): Promise<PurchaseResult> {
+async function purchaseIOS(contentType: ContentType, contentId: string, pricePaise: number, extraBody?: Record<string, unknown>): Promise<PurchaseResult> {
   const ready = await ensureIAPReady();
   if (!ready || !RNIap) {
     Alert.alert("Payment Not Available", "In-app purchases require the full BSH app build.");
@@ -76,6 +77,7 @@ async function purchaseIOS(contentType: ContentType, contentId: string, pricePai
       transactionReceipt: purchase.transactionReceipt,
       contentType,
       contentId,
+      ...extraBody,
     });
     await RNIap.finishTransaction({ purchase });
     await clearPending(productId);
@@ -147,6 +149,26 @@ export async function purchaseProgram(params: {
   const effectivePaise = params.discountPricePaise || params.pricePaise;
   if (Platform.OS === "ios") return purchaseIOS("program", params.programId, effectivePaise);
   return purchaseAndroid("program", params.programId, params.title, effectivePaise, params.razorpayPaymentLink, params.userName, params.userEmail);
+}
+
+export async function purchaseConsultation(params: {
+  trainerId: string; trainerName: string;
+  sessions: number; durationMins: number; bonusSessions: number;
+  totalPaise: number; ratePerMin: number;
+  clientNote: string; preferredTime: string;
+  userName: string; userEmail: string;
+}): Promise<PurchaseResult> {
+  return purchaseIOS("consultation", params.trainerId, params.totalPaise, {
+    consultationData: {
+      trainerName:   params.trainerName,
+      sessions:      params.sessions,
+      durationMins:  params.durationMins,
+      bonusSessions: params.bonusSessions,
+      ratePerMin:    params.ratePerMin,
+      clientNote:    params.clientNote,
+      preferredTime: params.preferredTime,
+    },
+  });
 }
 
 /**
