@@ -521,47 +521,59 @@ export default function ProgramDetailScreen() {
           )}
 
           {/* Filter tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
             {(["all", "live_class", "announcement", "content"] as const).map(val => {
-              const lbl = val === "all" ? "All" : val === "live_class" ? "🔴 Live" : val === "announcement" ? "📢 Announcements" : "📚 Content";
+              const iconName = val === "all" ? "apps" : val === "live_class" ? "radio" : val === "announcement" ? "megaphone" : "library";
+              const lbl = val === "all" ? "All" : val === "live_class" ? "Live" : val === "announcement" ? "Announcements" : "Content";
+              const active = filter === val;
               return (
                 <TouchableOpacity key={val}
                   onPress={() => { setFilter(val); if (val === "content" && !mediaFetched) loadMedia(); }}
-                  style={[s.filterTab, filter === val && { backgroundColor: accent + "25", borderColor: accent }]}>
-                  <Text style={[s.filterTabTxt, { color: filter === val ? accent : "#64748b" }]}>{lbl}</Text>
+                  style={[s.filterTab, active && { backgroundColor: accent + "25", borderColor: accent }]}>
+                  <Ionicons name={iconName as any} size={13} color={active ? accent : "#64748b"} style={{ marginRight: 5 }} />
+                  <Text style={[s.filterTabTxt, { color: active ? accent : "#64748b" }]}>{lbl}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          {/* Content tab */}
+          {/* Content tab — 2-column portrait grid */}
           {filter === "content" && (
             mediaLoading ? (
-              <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
+              <ActivityIndicator color={accent} size="large" style={{ marginTop: 40 }} />
             ) : mediaItems.length === 0 ? (
               <View style={s.emptyState}>
-                <Text style={{ fontSize: 36, marginBottom: 10 }}>📭</Text>
+                <Ionicons name="cloud-upload-outline" size={52} color="#1e293b" style={{ marginBottom: 14 }} />
                 <Text style={s.emptyTitle}>No Content Yet</Text>
-                <Text style={s.emptySub}>Videos, PDFs and resources will appear here once uploaded.</Text>
+                <Text style={s.emptySub}>Videos, PDFs and resources will appear here once uploaded by your trainer.</Text>
               </View>
             ) : (
-              mediaItems.map(item => (
-                <TouchableOpacity key={item._id} style={s.mediaCard} onPress={() => openContentItem(item)} activeOpacity={0.75}>
-                  <Text style={s.mediaIcon}>{item.type === "video" ? "🎬" : item.type === "pdf" ? "📄" : "🖼️"}</Text>
-                  <View style={{ flex: 1, marginRight: 10 }}>
-                    <Text style={s.mediaTitle} numberOfLines={2}>{item.title}</Text>
-                    {item.description ? <Text style={s.mediaSub} numberOfLines={1}>{item.description}</Text> : null}
-                    {item.tags.length > 0 && (
-                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 5 }}>
-                        {item.tags.slice(0, 3).map(tag => (
-                          <View key={tag} style={s.mediaTag}><Text style={s.mediaTagTxt}>{tag}</Text></View>
-                        ))}
+              <View style={s.mediaGrid}>
+                {mediaItems.map(item => {
+                  const iconName = item.type === "video" ? "play-circle" : item.type === "pdf" ? "document-text" : "image";
+                  const iconColor = item.type === "video" ? "#60a5fa" : item.type === "pdf" ? "#f472b6" : "#34d399";
+                  const typeLbl  = item.type === "video" ? "VIDEO" : item.type === "pdf" ? "PDF" : "IMAGE";
+                  return (
+                    <TouchableOpacity key={item._id} style={s.mediaCard} onPress={() => openContentItem(item)} activeOpacity={0.75}>
+                      <View style={[s.mediaIconWrap, { backgroundColor: iconColor + "18" }]}>
+                        <Ionicons name={iconName as any} size={36} color={iconColor} />
                       </View>
-                    )}
-                  </View>
-                  <Text style={{ color: "#60a5fa", fontSize: 18 }}>›</Text>
-                </TouchableOpacity>
-              ))
+                      <View style={[s.mediaTypePill, { backgroundColor: iconColor + "20" }]}>
+                        <Text style={[s.mediaTypeTxt, { color: iconColor }]}>{typeLbl}</Text>
+                      </View>
+                      <Text style={s.mediaTitle} numberOfLines={3}>{item.title}</Text>
+                      {item.description ? <Text style={s.mediaSub} numberOfLines={2}>{item.description}</Text> : null}
+                      {item.tags.length > 0 && (
+                        <View style={s.mediaTagRow}>
+                          {item.tags.slice(0, 2).map(tag => (
+                            <View key={tag} style={s.mediaTag}><Text style={s.mediaTagTxt}>{tag}</Text></View>
+                          ))}
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             )
           )}
 
@@ -1071,13 +1083,26 @@ const s = StyleSheet.create({
   annBadge: { borderWidth: 1, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3 },
   annBadgeTxt: { fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
 
-  // Media content cards
-  mediaCard:   { flexDirection: "row", alignItems: "center", backgroundColor: "#0f0a2e", borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: "#0f2557" },
-  mediaIcon:   { fontSize: 28, marginRight: 12 },
-  mediaTitle:  { fontSize: 13, fontWeight: "700", color: "#f1f5f9", marginBottom: 3, lineHeight: 18 },
-  mediaSub:    { fontSize: 11, color: "#64748b", lineHeight: 16 },
-  mediaTag:    { backgroundColor: "rgba(96,165,250,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  mediaTagTxt: { fontSize: 10, color: "#60a5fa", fontWeight: "600" },
+  // Media content — portrait 2-column grid
+  mediaGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingBottom: 8 },
+  mediaCard:     {
+    width: (SW - 44) / 2,
+    backgroundColor: "#0f0a2e", borderRadius: 16,
+    padding: 14, borderWidth: 1, borderColor: "#1e293b",
+    alignItems: "center",
+  },
+  mediaIconWrap: {
+    width: 68, height: 68, borderRadius: 34,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 10,
+  },
+  mediaTypePill: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, marginBottom: 8 },
+  mediaTypeTxt:  { fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  mediaTitle:    { fontSize: 12, fontWeight: "700", color: "#f1f5f9", textAlign: "center", lineHeight: 17, marginBottom: 5 },
+  mediaSub:      { fontSize: 10, color: "#64748b", textAlign: "center", lineHeight: 15, marginBottom: 6 },
+  mediaTagRow:   { flexDirection: "row", flexWrap: "wrap", gap: 4, justifyContent: "center", marginTop: 2 },
+  mediaTag:      { backgroundColor: "rgba(96,165,250,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  mediaTagTxt:   { fontSize: 9, color: "#60a5fa", fontWeight: "600" },
 });
 
 // ── Healing Tools unlocked styles ─────────────────────────────────────────────
