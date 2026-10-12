@@ -170,6 +170,14 @@ const PROGRAMS: Record<string, ProgramDetail> = {
   },
 };
 
+// ── Media content types ───────────────────────────────────────────────────────
+interface MediaItem {
+  _id: string; title: string; description?: string;
+  type: "video" | "pdf" | "image";
+  muxPlaybackId?: string; gcsKey?: string;
+  tags: string[]; isFree: boolean;
+}
+
 // ── Post types for member area ────────────────────────────────────────────────
 interface Post {
   _id: string;
@@ -209,7 +217,10 @@ export default function ProgramDetailScreen() {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
-  const [filter, setFilter] = useState<"all" | "live_class" | "announcement">("all");
+  const [filter, setFilter] = useState<"all" | "live_class" | "announcement" | "content">("all");
+  const [mediaItems,   setMediaItems]   = useState<MediaItem[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaFetched, setMediaFetched] = useState(false);
 
   const prog = PROGRAMS[slug ?? ""] ?? PROGRAMS["advance-hypnosis"];
 
@@ -239,6 +250,28 @@ export default function ProgramDetailScreen() {
       })
       .catch(() => {});
   }, [prog.programId]);
+
+  const loadMedia = async () => {
+    if (mediaFetched) return;
+    setMediaLoading(true);
+    try {
+      const { data } = await client.get(`/media/for-me?target=program&programId=${prog.programId}`);
+      setMediaItems(data.items || []);
+    } catch {}
+    setMediaFetched(true);
+    setMediaLoading(false);
+  };
+
+  const openContentItem = async (item: MediaItem) => {
+    if (item.type === "video") {
+      router.push({ pathname: "/watch/[lessonId]" as any, params: { lessonId: item._id, source: "media" } });
+      return;
+    }
+    try {
+      const { data } = await client.get(`/media/${item._id}/stream`);
+      if (data.streamUrl) Linking.openURL(data.streamUrl);
+    } catch {}
+  };
 
   const handleJoin = async (planId?: string) => {
     if (prog.programId === "hypnosis-2" && Platform.OS !== "ios") {
@@ -489,16 +522,51 @@ export default function ProgramDetailScreen() {
 
           {/* Filter tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-            {([["all", "All"], ["live_class", "🔴 Live"], ["announcement", "📢 Announcements"]] as const).map(([val, lbl]) => (
-              <TouchableOpacity key={val} onPress={() => setFilter(val)}
-                style={[s.filterTab, filter === val && { backgroundColor: accent + "25", borderColor: accent }]}>
-                <Text style={[s.filterTabTxt, { color: filter === val ? accent : "#64748b" }]}>{lbl}</Text>
-              </TouchableOpacity>
-            ))}
+            {(["all", "live_class", "announcement", "content"] as const).map(val => {
+              const lbl = val === "all" ? "All" : val === "live_class" ? "🔴 Live" : val === "announcement" ? "📢 Announcements" : "📚 Content";
+              return (
+                <TouchableOpacity key={val}
+                  onPress={() => { setFilter(val); if (val === "content" && !mediaFetched) loadMedia(); }}
+                  style={[s.filterTab, filter === val && { backgroundColor: accent + "25", borderColor: accent }]}>
+                  <Text style={[s.filterTabTxt, { color: filter === val ? accent : "#64748b" }]}>{lbl}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
+          {/* Content tab */}
+          {filter === "content" && (
+            mediaLoading ? (
+              <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
+            ) : mediaItems.length === 0 ? (
+              <View style={s.emptyState}>
+                <Text style={{ fontSize: 36, marginBottom: 10 }}>📭</Text>
+                <Text style={s.emptyTitle}>No Content Yet</Text>
+                <Text style={s.emptySub}>Videos, PDFs and resources will appear here once uploaded.</Text>
+              </View>
+            ) : (
+              mediaItems.map(item => (
+                <TouchableOpacity key={item._id} style={s.mediaCard} onPress={() => openContentItem(item)} activeOpacity={0.75}>
+                  <Text style={s.mediaIcon}>{item.type === "video" ? "🎬" : item.type === "pdf" ? "📄" : "🖼️"}</Text>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={s.mediaTitle} numberOfLines={2}>{item.title}</Text>
+                    {item.description ? <Text style={s.mediaSub} numberOfLines={1}>{item.description}</Text> : null}
+                    {item.tags.length > 0 && (
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 5 }}>
+                        {item.tags.slice(0, 3).map(tag => (
+                          <View key={tag} style={s.mediaTag}><Text style={s.mediaTagTxt}>{tag}</Text></View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ color: "#60a5fa", fontSize: 18 }}>›</Text>
+                </TouchableOpacity>
+              ))
+            )
+          )}
+
           {/* Posts list */}
-          {postsLoading ? (
+          {filter !== "content" && (postsLoading ? (
             <ActivityIndicator color={accent} style={{ marginTop: 32 }} />
           ) : visible.length === 0 ? (
             <View style={s.emptyState}>
@@ -544,7 +612,7 @@ export default function ProgramDetailScreen() {
                 ))}
               </View>
             ))
-          )}
+          ))}
         </ScrollView>
       </View>
     );
@@ -1002,6 +1070,14 @@ const s = StyleSheet.create({
   postLinkTxt: { fontSize: 13, fontWeight: "700" },
   annBadge: { borderWidth: 1, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3 },
   annBadgeTxt: { fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
+
+  // Media content cards
+  mediaCard:   { flexDirection: "row", alignItems: "center", backgroundColor: "#0f0a2e", borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: "#0f2557" },
+  mediaIcon:   { fontSize: 28, marginRight: 12 },
+  mediaTitle:  { fontSize: 13, fontWeight: "700", color: "#f1f5f9", marginBottom: 3, lineHeight: 18 },
+  mediaSub:    { fontSize: 11, color: "#64748b", lineHeight: 16 },
+  mediaTag:    { backgroundColor: "rgba(96,165,250,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  mediaTagTxt: { fontSize: 10, color: "#60a5fa", fontWeight: "600" },
 });
 
 // ── Healing Tools unlocked styles ─────────────────────────────────────────────
