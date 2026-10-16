@@ -187,6 +187,8 @@ interface Post {
   scheduledAt?: string;
   links: { label: string; url: string }[];
   createdAt: string;
+  liveStatus?: "scheduled" | "live" | "ended";
+  _isLiveClass?: boolean;
 }
 
 const fmtDateTime = (s: string) =>
@@ -522,7 +524,7 @@ export default function ProgramDetailScreen() {
 
           {/* Filter tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            {(["all", "live_class", "announcement", "content"] as const).map(val => {
+            {(["all", "live_class", "content", "announcement"] as const).map(val => {
               const iconName = val === "all" ? "apps" : val === "live_class" ? "radio" : val === "announcement" ? "megaphone" : "library";
               const lbl = val === "all" ? "All" : val === "live_class" ? "Live" : val === "announcement" ? "Announcements" : "Content";
               const active = filter === val;
@@ -548,28 +550,35 @@ export default function ProgramDetailScreen() {
                 <Text style={s.emptySub}>Videos, PDFs and resources will appear here once uploaded by your trainer.</Text>
               </View>
             ) : (
-              <View style={s.mediaGrid}>
+              <View style={{ gap: 12 }}>
                 {mediaItems.map(item => {
                   const iconName = item.type === "video" ? "play-circle" : item.type === "pdf" ? "document-text" : "image";
                   const iconColor = item.type === "video" ? "#60a5fa" : item.type === "pdf" ? "#f472b6" : "#34d399";
                   const typeLbl  = item.type === "video" ? "VIDEO" : item.type === "pdf" ? "PDF" : "IMAGE";
                   return (
-                    <TouchableOpacity key={item._id} style={s.mediaCard} onPress={() => openContentItem(item)} activeOpacity={0.75}>
-                      <View style={[s.mediaIconWrap, { backgroundColor: iconColor + "18" }]}>
-                        <Ionicons name={iconName as any} size={36} color={iconColor} />
-                      </View>
-                      <View style={[s.mediaTypePill, { backgroundColor: iconColor + "20" }]}>
-                        <Text style={[s.mediaTypeTxt, { color: iconColor }]}>{typeLbl}</Text>
-                      </View>
-                      <Text style={s.mediaTitle} numberOfLines={3}>{item.title}</Text>
-                      {item.description ? <Text style={s.mediaSub} numberOfLines={2}>{item.description}</Text> : null}
-                      {item.tags.length > 0 && (
-                        <View style={s.mediaTagRow}>
-                          {item.tags.slice(0, 2).map(tag => (
-                            <View key={tag} style={s.mediaTag}><Text style={s.mediaTagTxt}>{tag}</Text></View>
-                          ))}
+                    <TouchableOpacity key={item._id} style={s.mediaCard} onPress={() => openContentItem(item)} activeOpacity={0.78}>
+                      {/* Banner */}
+                      <View style={[s.mediaBanner, { backgroundColor: iconColor + "12" }]}>
+                        <Ionicons name={iconName as any} size={52} color={iconColor} />
+                        <View style={[s.mediaTypePill, { backgroundColor: iconColor + "22", position: "absolute", top: 10, right: 10 }]}>
+                          <Text style={[s.mediaTypeTxt, { color: iconColor }]}>{typeLbl}</Text>
                         </View>
-                      )}
+                      </View>
+                      {/* Body */}
+                      <View style={s.mediaBody}>
+                        <Text style={s.mediaTitle} numberOfLines={2}>{item.title}</Text>
+                        {item.description ? <Text style={s.mediaSub} numberOfLines={2}>{item.description}</Text> : null}
+                        <View style={s.mediaFooter}>
+                          <View style={s.mediaTagRow}>
+                            {item.tags.slice(0, 3).map(tag => (
+                              <View key={tag} style={s.mediaTag}><Text style={s.mediaTagTxt}>{tag}</Text></View>
+                            ))}
+                          </View>
+                          <View style={[s.mediaPlayBtn, { backgroundColor: iconColor }]}>
+                            <Ionicons name={item.type === "video" ? "play" : "open-outline"} size={14} color="#fff" />
+                          </View>
+                        </View>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -587,27 +596,75 @@ export default function ProgramDetailScreen() {
               <Text style={s.emptySub}>Your trainer will post updates here soon.</Text>
             </View>
           ) : (
-            visible.map(post => post.type === "live_class" ? (
-              <View key={post._id} style={[s.postCard, { borderLeftColor: accent, borderLeftWidth: 3 }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <View style={post.scheduledAt && new Date(post.scheduledAt) > new Date() ? s.redDot : s.greyDot} />
-                  <Text style={{ color: "#94a3b8", fontSize: 11, fontWeight: "700", letterSpacing: 0.6 }}>
-                    {post.scheduledAt && new Date(post.scheduledAt) > new Date() ? "LIVE CLASS" : "LIVE CLASS (ENDED)"}
-                  </Text>
-                </View>
-                {post.scheduledAt && (
-                  <Text style={[s.postDate, { color: accent }]}>📅 {fmtDateTime(post.scheduledAt)}</Text>
-                )}
-                {post.title && <Text style={s.postTitle}>{post.title}</Text>}
-                {post.content ? <Text style={s.postContent}>{post.content}</Text> : null}
-                {post.links?.map((lk, i) => (
-                  <TouchableOpacity key={i} onPress={() => Linking.openURL(lk.url).catch(() => {})}
-                    style={[s.postLinkBtn, { borderColor: accent + "60" }]}>
-                    <Text style={[s.postLinkTxt, { color: accent }]}>🔗 {lk.label || "Join"}</Text>
+            visible.map(post => {
+              if (post.type === "live_class") {
+                const isLiveNow  = post.liveStatus === "live";
+                const isUpcoming = isLiveNow || !!(post.scheduledAt && new Date(post.scheduledAt) > new Date());
+                const d = post.scheduledAt ? new Date(post.scheduledAt) : null;
+                const dayLabel = d ? d.toLocaleDateString("en-IN", { weekday: "short" }).toUpperCase() : "";
+                const dateLabel = d ? d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+                const timeLabel = d ? d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "";
+                return (
+                  <TouchableOpacity
+                    key={post._id}
+                    style={[s.liveClassCard, { borderColor: isUpcoming ? accent + "40" : "#1e293b" }]}
+                    onPress={() => post.links?.[0] && Linking.openURL(post.links[0].url).catch(() => {})}
+                    activeOpacity={0.85}
+                  >
+                    {/* Status strip */}
+                    <View style={[s.liveClassStrip, { backgroundColor: isUpcoming ? "#ef444412" : "#0d1117" }]}>
+                      <View style={[s.stripStatusDot, { backgroundColor: isUpcoming ? "#ef4444" : "#475569" }]} />
+                      <Text style={[s.stripStatusTxt, { color: isUpcoming ? "#f87171" : "#64748b" }]}>
+                        {isLiveNow ? "🔴 LIVE NOW" : isUpcoming ? "UPCOMING CLASS" : "COMPLETED"}
+                      </Text>
+                    </View>
+
+                    <View style={s.liveClassBody}>
+                      {/* Calendar date block */}
+                      {d && (
+                        <View style={[s.liveClassDateBlock, { borderColor: isUpcoming ? accent + "35" : "#1e293b" }]}>
+                          <Text style={[s.liveClassDayAbbr, { color: isUpcoming ? accent : "#475569" }]}>{dayLabel}</Text>
+                          <Text style={[s.liveClassDayNum, { color: isUpcoming ? "#f1f5f9" : "#64748b" }]}>
+                            {d.getDate()}
+                          </Text>
+                          <Text style={[s.liveClassMonthYr, { color: isUpcoming ? "#94a3b8" : "#475569" }]}>
+                            {dateLabel.split(" ").slice(1).join(" ")}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Info side */}
+                      <View style={s.liveClassInfo}>
+                        {post.title && (
+                          <Text style={[s.liveClassTitle, { color: isUpcoming ? "#f1f5f9" : "#94a3b8" }]} numberOfLines={3}>
+                            {post.title}
+                          </Text>
+                        )}
+                        {d && (
+                          <View style={s.liveClassTimeRow}>
+                            <Ionicons name="time-outline" size={12} color="#64748b" />
+                            <Text style={s.liveClassTimeTxt}>{timeLabel}</Text>
+                          </View>
+                        )}
+                        {post.links && post.links.length > 0 && (
+                          <View style={[s.liveJoinBtn, {
+                            backgroundColor: isUpcoming ? accent : "transparent",
+                            borderColor: isUpcoming ? "transparent" : "#334155",
+                            borderWidth: isUpcoming ? 0 : 1,
+                          }]}>
+                            <Ionicons name={isUpcoming ? "videocam" : "checkmark-circle-outline"} size={13}
+                              color={isUpcoming ? "#fff" : "#475569"} />
+                            <Text style={[s.liveJoinTxt, { color: isUpcoming ? "#fff" : "#475569" }]}>
+                              {isLiveNow ? "Join Now" : isUpcoming ? "Join Class" : "Attended"}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
                   </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
+                );
+              }
+              return (
               <View key={post._id} style={s.postCard}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <View style={[s.annBadge, { borderColor: accent + "50", backgroundColor: accent + "18" }]}>
@@ -623,7 +680,8 @@ export default function ProgramDetailScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            ))
+              );
+            })
           ))}
         </ScrollView>
       </View>
@@ -1083,26 +1141,61 @@ const s = StyleSheet.create({
   annBadge: { borderWidth: 1, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3 },
   annBadgeTxt: { fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
 
-  // Media content — portrait 2-column grid
-  mediaGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingBottom: 8 },
-  mediaCard:     {
-    width: (SW - 44) / 2,
-    backgroundColor: "#0f0a2e", borderRadius: 16,
-    padding: 14, borderWidth: 1, borderColor: "#1e293b",
-    alignItems: "center",
+  // Media content — single-column vertical cards
+  mediaCard: {
+    backgroundColor: "#0f0a2e", borderRadius: 16, overflow: "hidden",
+    borderWidth: 1, borderColor: "#1e293b",
   },
-  mediaIconWrap: {
-    width: 68, height: 68, borderRadius: 34,
-    alignItems: "center", justifyContent: "center",
-    marginBottom: 10,
+  mediaBanner: {
+    height: 110, alignItems: "center", justifyContent: "center",
+    borderBottomWidth: 1, borderBottomColor: "#1e293b",
   },
-  mediaTypePill: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, marginBottom: 8 },
+  mediaBody:   { padding: 14 },
+  mediaTitle:  { fontSize: 14, fontWeight: "700", color: "#f1f5f9", lineHeight: 20, marginBottom: 4 },
+  mediaSub:    { fontSize: 12, color: "#64748b", lineHeight: 17, marginBottom: 10 },
+  mediaFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  mediaTagRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, flex: 1 },
+  mediaTag:    { backgroundColor: "rgba(96,165,250,0.12)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  mediaTagTxt: { fontSize: 10, color: "#60a5fa", fontWeight: "600" },
+  mediaTypePill: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3 },
   mediaTypeTxt:  { fontSize: 9, fontWeight: "800", letterSpacing: 1 },
-  mediaTitle:    { fontSize: 12, fontWeight: "700", color: "#f1f5f9", textAlign: "center", lineHeight: 17, marginBottom: 5 },
-  mediaSub:      { fontSize: 10, color: "#64748b", textAlign: "center", lineHeight: 15, marginBottom: 6 },
-  mediaTagRow:   { flexDirection: "row", flexWrap: "wrap", gap: 4, justifyContent: "center", marginTop: 2 },
-  mediaTag:      { backgroundColor: "rgba(96,165,250,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  mediaTagTxt:   { fontSize: 9, color: "#60a5fa", fontWeight: "600" },
+  mediaPlayBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+
+  // Live class calendar cards
+  liveClassCard: {
+    backgroundColor: "#0f0a2e", borderRadius: 16, overflow: "hidden",
+    borderWidth: 1, marginBottom: 12,
+  },
+  liveClassStrip: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 14, paddingVertical: 8,
+  },
+  stripStatusDot: { width: 6, height: 6, borderRadius: 3 },
+  stripStatusTxt: { fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
+  liveClassBody: {
+    flexDirection: "row", alignItems: "flex-start", gap: 14,
+    padding: 14, paddingTop: 12,
+  },
+  liveClassDateBlock: {
+    width: 58, alignItems: "center", paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1, flexShrink: 0,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  liveClassDayAbbr:  { fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 2 },
+  liveClassDayNum:   { fontSize: 26, fontWeight: "900", lineHeight: 30 },
+  liveClassMonthYr:  { fontSize: 9, fontWeight: "600", marginTop: 2, textAlign: "center" },
+  liveClassInfo: { flex: 1 },
+  liveClassTitle: { fontSize: 14, fontWeight: "800", lineHeight: 20, marginBottom: 6 },
+  liveClassTimeRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
+  liveClassTimeTxt: { color: "#64748b", fontSize: 12, fontWeight: "600" },
+  liveJoinBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start",
+    borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12,
+  },
+  liveJoinTxt: { fontSize: 12, fontWeight: "700" },
 });
 
 // ── Healing Tools unlocked styles ─────────────────────────────────────────────

@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput,
-  ActivityIndicator, Alert, Modal, BackHandler, Animated, Dimensions,
+  ActivityIndicator, Alert, Modal, BackHandler, Animated, Dimensions, Linking,
 } from "react-native";
 import { router, useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -209,6 +209,15 @@ export default function LiveRoomScreen() {
         const endpoint = myRole === "host" ? "start" : "join";
         const { data: conn } = await client.post(`/live-classes/${classId}/${endpoint}`);
         if (cancelled) return;
+
+        // Zoom class — open the link and go back, no Agora needed
+        if (conn.platform === "zoom" && conn.zoomLink) {
+          Linking.openURL(conn.zoomLink).catch(() =>
+            Alert.alert("Could not open Zoom", "Please install the Zoom app or try opening the link in a browser.")
+          );
+          router.back();
+          return;
+        }
 
         if (conn.waiting) {
           setPhase("waiting-room");
