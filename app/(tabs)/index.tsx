@@ -98,6 +98,12 @@ const PROG_IMG: Record<string, number> = {
   "hypnosis-2":       hypnosis2Img,
   "healing-tools":    reikiImg,
 };
+// Default educator name per program (for batch card display)
+const PROG_EDUCATOR: Record<string, string> = {
+  "advance-hypnosis": "Dr. Pradeep Kumar",
+  "hypnosis-2":       "Dr. Pradeep Kumar",
+  "healing-tools":    "BSH Faculty",
+};
 // Fallback images by course category
 const CAT_IMG: Record<string, number> = {
   "Advance Hypnosis":      advHypnosisImg,
@@ -1115,12 +1121,13 @@ export default function HomeScreen() {
   }, [apiPrograms]);
 
   const displayBatches = useMemo(() => {
+    // Tier 1: standalone courses with isFeatured
     if (apiBatches.length > 0) {
       return apiBatches.map(c => ({
-        id:    c._id,
-        img:   CAT_IMG[c.category] || advHypnosisImg,
+        id: c._id, programId: "",
+        img: CAT_IMG[c.category] || advHypnosisImg,
         thumbUrl: c.thumbnail || "",
-        tags:  [c.language || "Hindi", c.level || "Full Course"],
+        tags: [c.language || "Hindi", c.level || "Full Course"],
         title: c.title,
         educator: c.educator?.name || "BSH Faculty",
         status: "upcoming" as const,
@@ -1128,13 +1135,30 @@ export default function HomeScreen() {
         price: fmtINR(c.discountPrice > 0 ? c.discountPrice : c.price),
         originalPrice: c.discountPrice > 0 && c.discountPrice < c.price ? fmtINR(c.price) : "",
         saving: c.discountPrice > 0 && c.discountPrice < c.price ? `${Math.round((1 - c.discountPrice / c.price) * 100)}%` : "",
-        category: c.category,
-        isActive: true,  // all published API courses are active
-        _course: c,
+        category: c.category, isActive: true, _course: c,
       }));
     }
-    return BATCHES.map(b => ({ ...b, thumbUrl:"", _course:null }));
-  }, [apiBatches]);
+    // Tier 2: programs (BSH uses programs as the primary content type)
+    // Live thumbnails + prices come directly from the admin panel
+    if (apiPrograms.length > 0) {
+      return apiPrograms.map(p => ({
+        id: p._id, programId: p.programId,
+        img: PROG_IMG[p.programId] || advHypnosisImg,
+        thumbUrl: p.thumbnail || "",
+        tags: [p.programType || "Full Course", "Hindi"],
+        title: p.title,
+        educator: PROG_EDUCATOR[p.programId] || "Dr. Pradeep Kumar",
+        status: "upcoming" as const,
+        startLabel: p.duration || (p.features?.length ? `${p.features.length} Modules Included` : "Full Program"),
+        price: fmtINR(p.discountPrice > 0 ? p.discountPrice : p.price),
+        originalPrice: p.discountPrice > 0 && p.discountPrice < p.price ? fmtINR(p.price) : "",
+        saving: p.discountPrice > 0 && p.discountPrice < p.price ? `${Math.round((1 - p.discountPrice / p.price) * 100)}%` : "",
+        category: p.title, isActive: true, _course: null,
+      }));
+    }
+    // Tier 3: static fallback (shown only when API is completely unavailable)
+    return BATCHES.map(b => ({ ...b, thumbUrl: "", _course: null, programId: "" }));
+  }, [apiBatches, apiPrograms]);
 
   // ── Dynamic styles (theme-aware, memoised so StyleSheet.create only runs when theme changes) ─────────────────────────────────────────
   const s = useMemo(() => makeStyles(t, isDark, insets.top, HEADER_H), [t, isDark, insets.top, HEADER_H]);
@@ -1627,7 +1651,7 @@ export default function HomeScreen() {
             <View>
               <Text style={[s.sectionTitle, {color:t.text}]} numberOfLines={1}>Popular Batches</Text>
               <Text style={[s.sectionSub, {color:t.textMuted}]}>
-                {apiBatches.length > 0 ? "Live from admin · Razorpay enabled" : "Hand-picked by our educators"}
+                {(apiBatches.length > 0 || apiPrograms.length > 0) ? "Live from admin · Updated prices" : "Hand-picked by our educators"}
               </Text>
             </View>
             <TouchableOpacity onPress={()=>router.push("/(tabs)/explore")}>
@@ -1692,19 +1716,19 @@ export default function HomeScreen() {
                       <View style={{flexDirection:"row",gap:8}}>
                         <TouchableOpacity style={[s.buyBtn, {backgroundColor:"#0c2461"}]}
                           onPress={()=>{
-                            const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
-                            if (slug) router.push(`/program/${slug}` as any);
+                            const pid = (batch as any).programId;
+                            if (pid) router.push(`/program/${pid}` as any);
                             else if (batch._course) setBatchModal(batch._course);
-                            else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
+                            else router.push({ pathname:"/(tabs)/explore" as any });
                           }}>
                           <Text style={s.buyBtnTxt}>Enroll Now</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[s.detailBtn, {borderColor:t.border}]}
                           onPress={()=>{
-                            const slug = batch.category==="Advance Hypnosis"?"advance-hypnosis":batch.category==="Hypnosis 2.0"?"hypnosis-2":null;
-                            if (slug) router.push(`/program/${slug}` as any);
+                            const pid = (batch as any).programId;
+                            if (pid) router.push(`/program/${pid}` as any);
                             else if (batch._course) setBatchModal(batch._course);
-                            else router.push({ pathname:"/(tabs)/explore", params:{ category:batch.category } });
+                            else router.push({ pathname:"/(tabs)/explore" as any });
                           }}>
                           <Text style={[s.detailBtnTxt, {color:t.text}]}>View Details</Text>
                         </TouchableOpacity>
