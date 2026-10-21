@@ -188,12 +188,14 @@ export default function ExploreScreen() {
 
   const SORT_LABELS: Record<string, string> = { popular: "Most Popular", newest: "Newest First", price: "Price: Low to High" };
 
-  // Memoized renderItem — stable reference prevents per-card re-renders on scroll
-  const renderCourseItem = useCallback(({ item }: { item: StaticCourse }) => (
+  // Memoized renderItem — uses ApiCourseCard for live API data, StaticCourseCard for fallback
+  const renderCourseItem = useCallback(({ item }: { item: StaticCourse | Course }) => (
     <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-      <StaticCourseCard course={item as StaticCourse} />
+      {displayStatic
+        ? <StaticCourseCard course={item as StaticCourse} />
+        : <ApiCourseCard course={item as Course} />}
     </View>
-  ), []);
+  ), [displayStatic]);
 
   // Memoized header — only re-renders when programs/categories/loading state changes
   const listHeader = useMemo(() => (
@@ -213,7 +215,9 @@ export default function ExploreScreen() {
           const priceStr = typeLabel === "Subscription"
             ? `₹${priceRs}/mo`
             : `₹${priceRs.toLocaleString("en-IN")}`;
-          const localImg = FLAGSHIP_IMG[prog.programId] ?? prog.img ?? advHypnosisImg;
+          const localImg = (prog.thumbnail && typeof prog.thumbnail === "string" && prog.thumbnail.startsWith("http"))
+            ? { uri: prog.thumbnail }
+            : FLAGSHIP_IMG[prog.programId] ?? prog.img ?? advHypnosisImg;
           const slug = prog.programId;
           const active = prog.isActive !== false;
 
@@ -394,8 +398,8 @@ export default function ExploreScreen() {
         onScroll={handleMainScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: HEADER_H + 8, paddingBottom: 56 }}
-        data={isLoading ? [] : (displayStatic ? filteredStatic : apiCourses as unknown as StaticCourse[])}
-        keyExtractor={(item) => String((item as StaticCourse).id ?? (item as any)._id)}
+        data={isLoading ? [] : (displayStatic ? filteredStatic : apiCourses)}
+        keyExtractor={(item) => String((item as StaticCourse).id ?? (item as Course)._id)}
         renderItem={renderCourseItem}
         removeClippedSubviews
         maxToRenderPerBatch={5}
@@ -420,13 +424,88 @@ export default function ExploreScreen() {
   );
 }
 
+// ── Live API Course Card ──────────────────────────────────────────────────────
+const ApiCourseCard = React.memo(function ApiCourseCard({ course }: { course: Course }) {
+  const priceRs = Math.round((course.discountPrice ?? course.price) / 100);
+  const hasDiscount = course.discountPrice != null && course.discountPrice > 0 && course.discountPrice < course.price;
+  const originalRs = hasDiscount ? Math.round(course.price / 100) : null;
+  return (
+    <TouchableOpacity
+      style={[cardStyles.card, { borderColor: "#0f2557" }]}
+      activeOpacity={0.88}
+      onPress={() => router.push(`/course/${course._id}` as any)}
+    >
+      <View style={cardStyles.imgWrapper}>
+        <Image
+          source={course.thumbnail ? { uri: course.thumbnail } : require("../../assets/BSH-logo-02.png")}
+          style={cardStyles.img}
+          contentFit="cover"
+        />
+        <View style={cardStyles.imgDim} />
+        <View style={[cardStyles.statusBadge, cardStyles.statusLive]}>
+          <View style={cardStyles.liveDot} />
+          <Text style={cardStyles.statusTxt}>LIVE</Text>
+        </View>
+        <View style={cardStyles.tagRow}>
+          {course.language && (
+            <View style={cardStyles.tag}><Text style={cardStyles.tagTxt}>{course.language}</Text></View>
+          )}
+          {course.level && (
+            <View style={cardStyles.tag}><Text style={cardStyles.tagTxt}>{course.level}</Text></View>
+          )}
+        </View>
+      </View>
+      <View style={cardStyles.body}>
+        <Text style={cardStyles.title} numberOfLines={2}>{course.title}</Text>
+        <View style={cardStyles.educatorRow}>
+          <Ionicons name="person-circle-outline" size={15} color="#60a5fa" />
+          <Text style={cardStyles.educatorTxt}>{course.educator?.name ?? ""}</Text>
+        </View>
+        <View style={cardStyles.metaRow}>
+          <View style={cardStyles.metaItem}>
+            <Ionicons name="star" size={12} color="#fbbf24" />
+            <Text style={cardStyles.metaVal}>{(course.rating ?? 0).toFixed(1)}</Text>
+          </View>
+          <View style={cardStyles.metaDot} />
+          <View style={cardStyles.metaItem}>
+            <Ionicons name="people-outline" size={12} color="#60a5fa" />
+            <Text style={cardStyles.metaVal}>{(course.enrollmentCount ?? 0).toLocaleString()} students</Text>
+          </View>
+          <View style={cardStyles.metaDot} />
+          <View style={cardStyles.metaItem}>
+            <Ionicons name="book-outline" size={12} color="#34d399" />
+            <Text style={cardStyles.metaVal}>{course.totalLessons ?? 0} lessons</Text>
+          </View>
+        </View>
+        <View style={cardStyles.divider} />
+        <View style={cardStyles.priceRow}>
+          <View>
+            <Text style={cardStyles.price}>{priceRs === 0 ? "Free" : `₹${priceRs.toLocaleString("en-IN")}`}</Text>
+            {originalRs && <Text style={cardStyles.originalPrice}>₹{originalRs.toLocaleString("en-IN")}</Text>}
+          </View>
+          <TouchableOpacity style={cardStyles.enrollBtn} onPress={() => router.push(`/course/${course._id}` as any)}>
+            <Text style={cardStyles.enrollTxt}>{priceRs === 0 ? "Enroll Free" : "View Course"}</Text>
+            <Ionicons name="arrow-forward" size={13} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 // ── Rich Course Card ──────────────────────────────────────────────────────────
 const StaticCourseCard = React.memo(function StaticCourseCard({ course }: { course: StaticCourse }) {
   return (
     <View style={[cardStyles.card, cardStyles.cardDimmed]}>
       {/* Image */}
       <View style={cardStyles.imgWrapper}>
-        <Image source={course.img} style={[cardStyles.img, { opacity: 0.45 }]} contentFit="cover" />
+        <Image
+            source={(course as any).thumbnail && typeof (course as any).thumbnail === "string" && (course as any).thumbnail.startsWith("http")
+              ? { uri: (course as any).thumbnail }
+              : course.img}
+            style={[cardStyles.img, { opacity: 0.45 }]}
+            contentFit="cover"
+          />
         <View style={cardStyles.imgDim} />
         {/* Dark overlay for coming soon */}
         <View style={cardStyles.comingSoonOverlay}>

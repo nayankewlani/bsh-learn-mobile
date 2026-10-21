@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform, Linking } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
@@ -9,6 +9,7 @@ import { purchaseCourse, restorePurchases } from "../../services/purchaseService
 
 interface Lesson { _id: string; title: string; isFree: boolean; duration: number; muxPlaybackId?: string; chapter: string; }
 interface Chapter { _id: string; title: string; order: number; }
+interface MediaItem { _id: string; title: string; description?: string; type: "video" | "pdf" | "image"; muxPlaybackId?: string; gcsKey?: string; tags: string[]; }
 interface Course { _id: string; title: string; description: string; educator: { name: string }; category: string; level: string; price: number; discountPrice?: number; thumbnail: string; rating: number; enrollmentCount: number; totalLessons: number; requirements: string[]; objectives: string[]; razorpayPaymentLink?: string; }
 
 export default function CourseDetailScreen() {
@@ -18,6 +19,7 @@ export default function CourseDetailScreen() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -44,7 +46,13 @@ export default function CourseDetailScreen() {
         setChapters(data.chapters);
         setLessons(data.lessons);
         setIsEnrolled(data.isEnrolled);
+        if (data.isEnrolled) {
+          client.get(`/media/for-me?target=course&courseId=${id}`)
+            .then(r => setMediaItems(r.data.items || []))
+            .catch(() => {});
+        }
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -63,7 +71,7 @@ export default function CourseDetailScreen() {
     try {
       const result = await purchaseCourse({
         courseId: course!._id, title: course!.title,
-        priceRupees: course!.price, discountPriceRupees: course!.discountPrice,
+        priceRupees: Math.round(course!.price / 100), discountPriceRupees: course!.discountPrice ? Math.round(course!.discountPrice / 100) : undefined,
         razorpayPaymentLink: course!.razorpayPaymentLink,
         userName: user.name, userEmail: user.email,
       });
@@ -77,7 +85,9 @@ export default function CourseDetailScreen() {
   if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.primary} size="large" /></View>;
   if (!course) return <View style={styles.center}><Text style={{ color: COLORS.textMuted }}>Course not found</Text></View>;
 
-  const price = course.discountPrice ?? course.price;
+  // DB stores price in paise; convert to rupees for display
+  const priceRs = Math.round((course.discountPrice ?? course.price) / 100);
+  const price   = course.discountPrice ?? course.price;  // keep paise for payment
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -103,14 +113,14 @@ export default function CourseDetailScreen() {
 
         {!isEnrolled && (
           <View style={styles.priceBox}>
-            <Text style={styles.price}>{price === 0 ? "Free" : `₹${price.toLocaleString()}`}</Text>
+            <Text style={styles.price}>{priceRs === 0 ? "Free" : `₹${priceRs.toLocaleString("en-IN")}`}</Text>
             <TouchableOpacity style={styles.enrollBtn} onPress={enroll} disabled={enrolling}>
-              <Text style={styles.enrollBtnText}>{enrolling ? "Enrolling..." : isEnrolled ? "Enrolled ✓" : price === 0 ? "Enroll Free" : "Buy Now"}</Text>
+              <Text style={styles.enrollBtnText}>{enrolling ? "Enrolling..." : isEnrolled ? "Enrolled ✓" : priceRs === 0 ? "Enroll Free" : "Buy Now"}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {!isEnrolled && price > 0 && Platform.OS === "ios" && (
+        {!isEnrolled && priceRs > 0 && Platform.OS === "ios" && (
           <TouchableOpacity onPress={handleRestore} disabled={restoring} style={{ alignSelf: "center", marginBottom: 16 }}>
             <Text style={{ color: COLORS.textMuted, fontSize: 13, textDecorationLine: "underline" }}>
               {restoring ? "Restoring…" : "Restore Purchases"}
@@ -151,6 +161,36 @@ export default function CourseDetailScreen() {
             </View>
           ))}
         </View>
+
+        {isEnrolled && mediaItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Resources</Text>
+            {mediaItems.map(item => (
+              <TouchableOpacity
+                key={item._id}
+                style={styles.mediaCard}
+                activeOpacity={0.75}
+                onPress={async () => {
+                  if (item.type === "video") {
+                    router.push({ pathname: "/watch/[lessonId]" as any, params: { lessonId: item._id, source: "media" } });
+                  } else {
+                    try {
+                      const { data } = await client.get(`/media/${item._id}/stream`);
+                      if (data.streamUrl) Linking.openURL(data.streamUrl);
+                    } catch {}
+                  }
+                }}
+              >
+                <Text style={styles.mediaIcon}>{item.type === "video" ? "🎬" : item.type === "pdf" ? "📄" : "🖼️"}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mediaTitle} numberOfLines={2}>{item.title}</Text>
+                  {item.description ? <Text style={styles.mediaDesc} numberOfLines={1}>{item.description}</Text> : null}
+                </View>
+                <Text style={{ color: COLORS.primaryLight, fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -178,7 +218,11 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginBottom: 12 },
   listItem: { flexDirection: "row", gap: 10, marginBottom: 8 },
   listText: { color: "#93c5fd", fontSize: 14, flex: 1 },
-  chapter: { backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 12, overflow: "hidden" },
+  chapter:    { backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 12, overflow: "hidden" },
+  mediaCard:  { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border ?? COLORS.surface },
+  mediaIcon:  { fontSize: 26, marginRight: 12 },
+  mediaTitle: { fontSize: 13, fontWeight: "700", color: COLORS.text, marginBottom: 2 },
+  mediaDesc:  { fontSize: 11, color: COLORS.textMuted },
   chapterTitle: { color: COLORS.text, fontWeight: "700", fontSize: 14, padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.surface2 },
   lesson: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.surface2 },
   lessonIcon: { fontSize: 14 },
