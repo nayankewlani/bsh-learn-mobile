@@ -1115,7 +1115,6 @@ export default function HomeScreen() {
   }, [apiPrograms]);
 
   const displayBatches = useMemo(() => {
-    const ACTIVE_CATS = new Set(["Advance Hypnosis", "Hypnosis 2.0"]);
     if (apiBatches.length > 0) {
       return apiBatches.map(c => ({
         id:    c._id,
@@ -1126,11 +1125,11 @@ export default function HomeScreen() {
         educator: c.educator?.name || "BSH Faculty",
         status: "upcoming" as const,
         startLabel: `${c.enrollmentCount || 0} enrolled · ⭐ ${c.rating?.toFixed(1) || "New"}`,
-        price: fmtINR(c.discountPrice || c.price),
-        originalPrice: c.discountPrice > 0 ? fmtINR(c.price) : "",
-        saving: c.discountPrice > 0 ? `${Math.round((1 - c.discountPrice / c.price) * 100)}%` : "",
+        price: fmtINR(c.discountPrice > 0 ? c.discountPrice : c.price),
+        originalPrice: c.discountPrice > 0 && c.discountPrice < c.price ? fmtINR(c.price) : "",
+        saving: c.discountPrice > 0 && c.discountPrice < c.price ? `${Math.round((1 - c.discountPrice / c.price) * 100)}%` : "",
         category: c.category,
-        isActive: ACTIVE_CATS.has(c.category),
+        isActive: true,  // all published API courses are active
         _course: c,
       }));
     }

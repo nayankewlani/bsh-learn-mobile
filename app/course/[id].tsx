@@ -10,7 +10,7 @@ import { purchaseCourse, restorePurchases } from "../../services/purchaseService
 interface Lesson { _id: string; title: string; isFree: boolean; duration: number; muxPlaybackId?: string; chapter: string; }
 interface Chapter { _id: string; title: string; order: number; }
 interface MediaItem { _id: string; title: string; description?: string; type: "video" | "pdf" | "image"; muxPlaybackId?: string; gcsKey?: string; tags: string[]; }
-interface Course { _id: string; title: string; description: string; educator: { name: string }; category: string; level: string; price: number; discountPrice?: number; thumbnail: string; rating: number; enrollmentCount: number; totalLessons: number; requirements: string[]; objectives: string[]; razorpayPaymentLink?: string; }
+interface Course { _id: string; title: string; description: string; educator: { name: string }; category: string; level: string; price: number; discountPrice?: number; thumbnail: string; rating: number; enrollmentCount: number; totalLessons: number; requirements: string[]; objectives: string[]; razorpayPaymentLink?: string; ghlPortalUrl?: string; }
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -134,6 +134,16 @@ export default function CourseDetailScreen() {
           </TouchableOpacity>
         )}
 
+        {isEnrolled && course.ghlPortalUrl ? (
+          <TouchableOpacity
+            style={styles.ghlBtn}
+            onPress={() => Linking.openURL(course.ghlPortalUrl!).catch(() => {})}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.ghlBtnText}>🎬 Watch Classes on BSH Portal</Text>
+          </TouchableOpacity>
+        ) : null}
+
         {course.objectives?.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>What you'll learn</Text>
@@ -212,8 +222,10 @@ const styles = StyleSheet.create({
   price: { color: COLORS.primaryLight, fontSize: 26, fontWeight: "900" },
   enrollBtn: { backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20 },
   enrollBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  startBtn: { backgroundColor: COLORS.primary, borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 16 },
+  startBtn: { backgroundColor: COLORS.primary, borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 12 },
   startBtnText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  ghlBtn: { backgroundColor: "#0f766e", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 16, borderWidth: 1, borderColor: "#134e4a" },
+  ghlBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
   section: { marginTop: 20 },
   sectionTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginBottom: 12 },
   listItem: { flexDirection: "row", gap: 10, marginBottom: 8 },
