@@ -25,6 +25,7 @@ const RazorpayCheckout: {
 
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Video, ResizeMode } from "expo-av";
+import * as Speech from "expo-speech";
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop, Rect as SvgRect } from "react-native-svg";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -426,7 +427,11 @@ const HeroCarousel = React.memo(({ heroSlides, isTabFocused, isHeroVisible, data
               return (
                 <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
                   onPress={() => router.push(dest as any)}>
-                  {b.thumbnailUrl ? (
+                  {/* Show thumbnail only when there is no video; when a video exists
+                      use a dark background so the educator photo doesn't flash while buffering */}
+                  {b.videoUrl ? (
+                    <View style={{ position:"absolute", width:"100%", height:"100%", backgroundColor:"#0d0820" }} />
+                  ) : b.thumbnailUrl ? (
                     <Image source={{ uri: b.thumbnailUrl }} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" cachePolicy="disk" />
                   ) : (
                     <Image source={slide1} style={{ position:"absolute", width:"100%", height:"100%" }} contentFit="cover" />
@@ -1013,6 +1018,17 @@ export default function HomeScreen() {
   const currentPhaseText   = playerPhases[currentPhaseIdx];
   const playerProgress     = Math.min(playerElapsed / playerDurationSecs, 1);
 
+  // Voice guidance — speak each phase as it transitions
+  useEffect(() => {
+    if (!healPlayer || !playerRunning) {
+      Speech.stop();
+      return;
+    }
+    Speech.stop();
+    Speech.speak(currentPhaseText, { language: "en-IN", pitch: 0.88, rate: 0.80 });
+    return () => { Speech.stop(); };
+  }, [currentPhaseText, playerRunning, healPlayer ? healPlayer.id : null]);
+
   const PLAYER_CIRC_R = 88;
   const PLAYER_CIRC_C = 2 * Math.PI * PLAYER_CIRC_R;
   const playerDashOff = PLAYER_CIRC_C * (1 - playerProgress);
@@ -1192,6 +1208,30 @@ export default function HomeScreen() {
           s={s}
           insets={insets}
         />
+
+        {/* ═══════════════ PROFILE COMPLETION BANNER ═══════════════ */}
+        {user && (() => {
+          const filled = [user.phone, (user as any).city, (user as any).profession].filter(Boolean).length;
+          if (filled === 3) return null;
+          const pct = Math.round((filled / 3) * 100);
+          const missing = [!user.phone && "Phone", !(user as any).city && "City", !(user as any).profession && "Profession"].filter(Boolean) as string[];
+          return (
+            <TouchableOpacity
+              style={{ marginHorizontal:16, marginBottom:14, backgroundColor:"#0c2461", borderRadius:14, padding:14, flexDirection:"row", alignItems:"center", gap:12 }}
+              onPress={() => router.push("/profile" as any)} activeOpacity={0.88}
+            >
+              <Ionicons name="person-circle-outline" size={32} color="rgba(255,255,255,0.85)" />
+              <View style={{ flex:1 }}>
+                <Text style={{ color:"#fff", fontWeight:"800", fontSize:13, marginBottom:6 }}>Complete your profile — {pct}%</Text>
+                <View style={{ height:5, backgroundColor:"rgba(255,255,255,0.2)", borderRadius:3, overflow:"hidden", marginBottom:5 }}>
+                  <View style={{ height:5, width:`${pct}%` as any, backgroundColor:"#22c55e", borderRadius:3 }} />
+                </View>
+                <Text style={{ color:"rgba(255,255,255,0.7)", fontSize:11 }}>{missing.join(" · ")} missing</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.6)" />
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* ═══════════════ STARTING SOON (countdown cards) ═══════════════
              Admin-managed upcoming class cards with live countdown timers.
@@ -1383,7 +1423,7 @@ export default function HomeScreen() {
               const initials = trainerInitials(tr.name);
               return (
                 <TouchableOpacity activeOpacity={0.85}
-                  onPress={() => router.push({ pathname: "/(tabs)/consultation" as any, params: { trainerId: api?._id || tr._id } })}
+                  onPress={() => { const id = api?._id || tr._id; if (id) router.push({ pathname: "/educator/[slug]" as any, params: { slug: id } }); }}
                   style={s.trainerCard}>
                   {LOCAL_IMGS_HOME[tr.name.toLowerCase()]
                     ? <Image source={LOCAL_IMGS_HOME[tr.name.toLowerCase()]} style={StyleSheet.absoluteFillObject} contentFit="cover" />
