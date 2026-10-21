@@ -46,12 +46,27 @@ export default function ProfileScreen() {
   const [editing, setEditing]   = useState(false);
   const [saving, setSaving]     = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Derive age from stored dob (year-based approximation)
+  const dobToAge = (dob?: string): string => {
+    if (!dob) return "";
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) return "";
+    return String(Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 3600 * 1000)));
+  };
+  const ageToDob = (age: string): string => {
+    const n = parseInt(age, 10);
+    if (isNaN(n) || n <= 0 || n > 120) return "";
+    return `${new Date().getFullYear() - n}-01-01`;
+  };
+
   const [form, setForm] = useState({
-    name:   user?.name   || "",
-    phone:  user?.phone  || "",
-    bio:    user?.bio    || "",
-    avatar: user?.avatar || "",
-    dob:    user?.dob    || "",
+    name:       user?.name       || "",
+    phone:      user?.phone      || "",
+    bio:        user?.bio        || "",
+    avatar:     user?.avatar     || "",
+    age:        dobToAge(user?.dob),
+    city:       user?.city       || "",
+    profession: user?.profession || "",
   });
 
   // Email change state
@@ -66,7 +81,8 @@ export default function ProfileScreen() {
     if (!form.name.trim()) { Alert.alert("Error", "Name cannot be empty"); return; }
     setSaving(true);
     try {
-      await updateProfile(form);
+      const payload = { ...form, dob: ageToDob(form.age) };
+      await updateProfile(payload);
       setEditing(false);
       Alert.alert("Success", "Profile updated!");
     } catch {
@@ -145,9 +161,6 @@ export default function ProfileScreen() {
 
   if (!user) return null;
 
-  const fmtDob = (d?: string) =>
-    d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : "—";
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
       <View style={s.header}>
@@ -166,16 +179,44 @@ export default function ProfileScreen() {
       <KeyboardAwareScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 60 }} enableOnAndroid>
 
         {/* Avatar & name row */}
-        <View style={s.avatarRow}>
-          <View style={s.avatarBox}>
-            <Text style={{ fontSize: 30 }}>{user.name?.charAt(0)?.toUpperCase() || "?"}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: "800", fontSize: 18, color: C.text }}>{user.name}</Text>
-            <Text style={{ fontSize: 12, color: C.accent, marginTop: 2 }}>{user.role === "educator" ? "👨‍🏫 Educator" : "🎓 Student"}</Text>
-            <Text style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{user.email}</Text>
-          </View>
-        </View>
+        {(() => {
+          const filled = [user.phone, (user as any).city, (user as any).profession].filter(Boolean).length;
+          const pct = Math.round((filled / 3) * 100);
+          const isComplete = filled === 3;
+          return (
+            <>
+              <View style={s.avatarRow}>
+                <View style={s.avatarBox}>
+                  <Text style={{ fontSize: 30 }}>{user.name?.charAt(0)?.toUpperCase() || "?"}</Text>
+                  {isComplete && (
+                    <View style={{ position: "absolute", bottom: -2, right: -2, backgroundColor: "#22c55e", borderRadius: 10, width: 18, height: 18, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: C.bg }}>
+                      <Ionicons name="checkmark" size={10} color="#fff" />
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: "800", fontSize: 18, color: C.text }}>{user.name}</Text>
+                  <Text style={{ fontSize: 12, color: C.accent, marginTop: 2 }}>{user.role === "educator" ? "👨‍🏫 Educator" : "🎓 Student"}</Text>
+                  <Text style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{user.email}</Text>
+                </View>
+              </View>
+              {!isComplete && (
+                <TouchableOpacity style={s.completionBanner} onPress={() => setEditing(true)} activeOpacity={0.85}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.completionTitle}>Complete your profile — {pct}%</Text>
+                    <View style={s.completionBar}>
+                      <View style={[s.completionFill, { width: `${pct}%` as any }]} />
+                    </View>
+                    <Text style={s.completionSub}>
+                      {[!user.phone && "Phone", !(user as any).city && "City", !(user as any).profession && "Profession"].filter(Boolean).join(" · ")} missing
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </>
+          );
+        })()}
 
         {/* ── Profile section ── */}
         <View style={s.section}>
@@ -185,9 +226,10 @@ export default function ProfileScreen() {
             <>
               <Field label="Full Name" value={form.name} onChangeText={v => setForm(f => ({ ...f, name: v }))} />
               <Field label="Phone" value={form.phone} onChangeText={v => setForm(f => ({ ...f, phone: v }))} keyboardType="phone-pad" placeholder="+91 ..." />
+              <Field label="City" value={form.city} onChangeText={v => setForm(f => ({ ...f, city: v }))} placeholder="e.g. Mumbai, Delhi, Bangalore..." />
+              <Field label="Profession" value={form.profession} onChangeText={v => setForm(f => ({ ...f, profession: v }))} placeholder="e.g. Healthcare Professional, Teacher..." />
               <Field label="Bio" value={form.bio} onChangeText={v => setForm(f => ({ ...f, bio: v }))} multiline placeholder="Tell others about yourself..." />
-              <Field label="Avatar URL" value={form.avatar} onChangeText={v => setForm(f => ({ ...f, avatar: v }))} placeholder="https://..." keyboardType="url" />
-              <Field label="Date of Birth (YYYY-MM-DD)" value={form.dob} onChangeText={v => setForm(f => ({ ...f, dob: v }))} placeholder="1990-01-25" keyboardType="numbers-and-punctuation" />
+              <Field label="Age" value={form.age} onChangeText={v => setForm(f => ({ ...f, age: v.replace(/[^0-9]/g, "") }))} placeholder="e.g. 28" keyboardType="number-pad" />
 
               <TouchableOpacity style={[s.btn, { backgroundColor: C.accent }]} onPress={handleSave} disabled={saving} activeOpacity={0.8}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Save Changes</Text>}
@@ -198,7 +240,9 @@ export default function ProfileScreen() {
               {[
                 ["Email",         user.email],
                 ["Phone",         user.phone || "—"],
-                ["Date of Birth", fmtDob(user.dob)],
+                ["City",          (user as any).city || "—"],
+                ["Profession",    (user as any).profession || "—"],
+                ["Age",           dobToAge(user.dob) ? `${dobToAge(user.dob)} years` : "—"],
                 ["Bio",           user.bio || "—"],
               ].map(([l, v]) => (
                 <View key={l} style={s.infoRow}>
@@ -273,6 +317,18 @@ export default function ProfileScreen() {
           }
         </TouchableOpacity>
 
+        {/* MOU / Membership Agreement (educators only) */}
+        {user?.role === "educator" && (
+          <TouchableOpacity
+            style={[s.btn, { backgroundColor: "rgba(12,36,97,0.35)", borderWidth: 1, borderColor: "rgba(99,102,241,0.4)", marginBottom: 8 }]}
+            onPress={() => router.push("/mou" as any)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="document-text-outline" size={16} color="#818cf8" style={{ marginRight: 8 }} />
+            <Text style={[s.btnTxt, { color: "#818cf8" }]}>View Membership Agreement</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Logout */}
         <TouchableOpacity style={[s.btn, { backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)", marginTop: 8 }]}
           onPress={() => Alert.alert("Log Out", "Are you sure?", [
@@ -292,8 +348,13 @@ const s = StyleSheet.create({
   header:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: C.border },
   backBtn:     { padding: 6 },
   headerTitle: { fontSize: 18, fontWeight: "800", color: C.text },
-  avatarRow:   { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 16 },
-  avatarBox:   { width: 60, height: 60, borderRadius: 30, backgroundColor: C.accentSoft, borderWidth: 2, borderColor: C.accent, alignItems: "center", justifyContent: "center" },
+  avatarRow:   { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 10 },
+  avatarBox:   { position: "relative", width: 60, height: 60, borderRadius: 30, backgroundColor: C.accentSoft, borderWidth: 2, borderColor: C.accent, alignItems: "center", justifyContent: "center" },
+  completionBanner: { flexDirection: "row", alignItems: "center", backgroundColor: "#0c2461", borderRadius: 14, padding: 12, marginBottom: 16, gap: 10 },
+  completionTitle:  { color: "#fff", fontSize: 13, fontWeight: "800", marginBottom: 6 },
+  completionBar:    { height: 5, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 3, overflow: "hidden", marginBottom: 5 },
+  completionFill:   { height: 5, backgroundColor: "#22c55e", borderRadius: 3 },
+  completionSub:    { color: "rgba(255,255,255,0.7)", fontSize: 11 },
   section:     { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 16 },
   sectionTitle:{ fontSize: 13, fontWeight: "800", color: C.text, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.5 },
   fieldLabel:  { fontSize: 11, fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 },
