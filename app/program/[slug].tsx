@@ -5,12 +5,13 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../stores/authStore";
 import { RAZORPAY_KEY_ID } from "../../constants";
 import client from "../../api/client";
 import { purchaseProgram } from "../../services/purchaseService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -306,11 +307,25 @@ export default function ProgramDetailScreen() {
         if (result.success) {
           setHasAccess(true);
           if (prog.programId === "healing-tools") {
+            AsyncStorage.setItem("bsh_healing_unlocked", "1").catch(() => {});
             Alert.alert("Unlocked! 🎉", "All 20 Healing Tools are now available.",
-              [{ text: "Open Tools", onPress: () => router.push("/(tabs)" as any) }]);
+              [{ text: "Open Tools", onPress: () => router.navigate("/(tabs)/" as any) }]);
           } else {
             Alert.alert("Welcome! 🎉", `You now have full access to ${prog.title}.`,
-              [{ text: "Start Learning", onPress: () => router.push("/(tabs)/explore") }]);
+              [{ text: "Start Learning", onPress: () => router.navigate("/(tabs)/explore" as any) }]);
+          }
+        } else if (!result.cancelled) {
+          // Re-check access in case a prior purchase already granted it
+          // (Apple re-sends the old transaction on a repeat purchase attempt).
+          try {
+            const { data } = await client.get(`/payments/program-access/${prog.programId}`);
+            if (data.hasAccess) {
+              setHasAccess(true);
+            } else {
+              Alert.alert("Purchase Failed", result.errorMessage || "Could not complete purchase. If you were charged, use \"Restore Purchases\" to recover access.");
+            }
+          } catch {
+            Alert.alert("Purchase Failed", result.errorMessage || "Could not complete purchase.");
           }
         }
       } finally { setLoading(false); }
@@ -348,11 +363,12 @@ export default function ProgramDetailScreen() {
       });
       setHasAccess(true);
       if (prog.programId === "healing-tools") {
+        AsyncStorage.setItem("bsh_healing_unlocked", "1").catch(() => {});
         Alert.alert("Unlocked! 🎉", "All 20 Healing Tools are now available.",
-          [{ text: "Open Tools", onPress: () => router.push("/(tabs)" as any) }]);
+          [{ text: "Open Tools", onPress: () => router.navigate("/(tabs)/" as any) }]);
       } else {
         Alert.alert("Welcome! 🎉", `You now have full access to ${prog.title}.`,
-          [{ text: "Start Learning", onPress: () => router.push("/(tabs)/explore") }]);
+          [{ text: "Start Learning", onPress: () => router.navigate("/(tabs)/explore" as any) }]);
       }
     } catch (err: unknown) {
       const e = err as { code?: number; description?: string; response?: { data?: { message?: string } }; message?: string };
@@ -432,7 +448,7 @@ export default function ProgramDetailScreen() {
           </View>
 
           {/* Open tools CTA */}
-          <TouchableOpacity style={ht.goBtn} onPress={() => router.push("/(tabs)" as any)}>
+          <TouchableOpacity style={ht.goBtn} onPress={() => router.navigate("/(tabs)/" as any)}>
             <Text style={ht.goBtnTxt}>Open Healing Tools →</Text>
           </TouchableOpacity>
 
@@ -691,14 +707,16 @@ export default function ProgramDetailScreen() {
   // ── Marketing page (not enrolled) ─────────────────────────────────────────
   return (
     <View style={s.root}>
+      {/* Fixed back button — outside ScrollView so it doesn't scroll away */}
+      <TouchableOpacity style={[s.backBtn, { top: insets.top + 10, position: "absolute", left: 16, zIndex: 100 }]} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={20} color="#fff" />
+      </TouchableOpacity>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
 
         {/* ── Hero ── */}
         <View style={[s.hero, { paddingTop: insets.top + 48 }]}>
-          {/* Back button */}
-          <TouchableOpacity style={[s.backBtn, { top: insets.top + 10 }]} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color="#fff" />
-          </TouchableOpacity>
+
 
           {/* Breadcrumb */}
           <View style={s.breadcrumb}>

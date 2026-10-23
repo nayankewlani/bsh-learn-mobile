@@ -2,7 +2,7 @@ import { Platform, Alert, Linking } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import client from "../api/client";
 import { RAZORPAY_KEY_ID } from "../constants";
-import { nearestTierProductId } from "../constants/iapTiers";
+import { nearestTierProductId, ALL_IAP_SKUS } from "../constants/iapTiers";
 
 // react-native-iap requires a native dev/production build — guard for Expo Go,
 // same pattern used for Agora elsewhere in this app.
@@ -14,7 +14,7 @@ const RazorpayCheckout: {
   open: (opts: any) => Promise<{ razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }>;
 } | null = _rzpMod?.default?.open ? _rzpMod.default : _rzpMod?.open ? _rzpMod : null;
 
-export interface PurchaseResult { success: boolean; cancelled?: boolean }
+export interface PurchaseResult { success: boolean; cancelled?: boolean; errorMessage?: string }
 
 type ContentType = "course" | "program" | "consultation";
 
@@ -46,7 +46,11 @@ async function ensureIAPReady(): Promise<boolean> {
   try {
     RNIap.setup({ storekitMode: "STOREKIT2_MODE" });
     await RNIap.initConnection();
-    await RNIap.getProducts({ skus: ALL_IAP_SKUS });
+    const products = await RNIap.getProducts({ skus: ALL_IAP_SKUS });
+    if (products.length === 0) {
+      console.error("[purchaseService] getProducts returned 0 products — store not ready");
+      return false;
+    }
     iapReady = true;
     return true;
   } catch (err) {
@@ -56,10 +60,10 @@ async function ensureIAPReady(): Promise<boolean> {
 }
 
 /**
- * iOS purchase path: StoreKit product for the nearest price tier, verified
- * server-side, which grants access to the specific course/program requested.
- * See API-server/src/config/iapTiers.ts for why purchases round to a tier
- * instead of a product being created per course.
+ * iOS purchase path: StoreKit2 listener-based flow. In react-native-iap v13+
+ * with StoreKit2, the JWS receipt arrives via purchaseUpdatedListener, NOT
+ * from the return value of requestPurchase. We set up the listener first,
+ * then trigger the purchase, and resolve when the listener fires.
  */
 async function purchaseIOS(contentType: ContentType, contentId: string, pricePaise: number, extraBody?: Record<string, unknown>): Promise<PurchaseResult> {
   const ready = await ensureIAPReady();
@@ -69,27 +73,66 @@ async function purchaseIOS(contentType: ContentType, contentId: string, pricePai
   }
   const productId = nearestTierProductId(pricePaise);
   await setPending(productId, contentType, contentId);
-  try {
-    const purchase = await RNIap.requestPurchase({ sku: productId }) as import("react-native-iap").ProductPurchase;
-    if (!purchase?.transactionReceipt) throw new Error("No transaction receipt returned by StoreKit");
 
-    await client.post("/payments/apple/verify", {
-      transactionReceipt: purchase.transactionReceipt,
-      contentType,
-      contentId,
-      ...extraBody,
+  return new Promise<PurchaseResult>((resolve) => {
+    let settled = false;
+    const settle = (result: PurchaseResult) => {
+      if (settled) return;
+      settled = true;
+      purchaseSub?.remove();
+      errorSub?.remove();
+      if (!result.success && !result.cancelled) {
+        // leave pending record so Restore Purchases can recover it
+      } else {
+        clearPending(productId).catch(() => {});
+      }
+      resolve(result);
+    };
+
+    const purchaseSub = RNIap!.purchaseUpdatedListener(async (purchase) => {
+      if (purchase.productId !== productId) return;
+      const receipt = purchase.transactionReceipt
+        || (purchase as any).verificationResultIOS
+        || (purchase as any).jwsRepresentationIos;
+      if (!receipt) {
+        // StoreKit2 fires the listener with a pending/deferred state before the
+        // real JWS arrives. Ignore silently — the second callback will have it.
+        return;
+      }
+      try {
+        await client.post("/payments/apple/verify", {
+          transactionReceipt: receipt,
+          contentType,
+          contentId,
+          ...extraBody,
+        });
+        await RNIap!.finishTransaction({ purchase });
+        settle({ success: true });
+      } catch (err: any) {
+        const msg = err?.response?.data?.message || err?.message || "Could not complete purchase. If you were charged, use \"Restore Purchases\" to recover access.";
+        settle({ success: false, errorMessage: msg });
+        // Alert is intentionally NOT shown here — the caller checks enrollment
+        // first and only shows the error if the user is genuinely not enrolled.
+      }
     });
-    await RNIap.finishTransaction({ purchase });
-    await clearPending(productId);
-    return { success: true };
-  } catch (err: any) {
-    if (err?.code === "E_USER_CANCELLED") { await clearPending(productId); return { success: false, cancelled: true }; }
-    // Leave the pending record in place — if the purchase actually went through
-    // on Apple's side despite our verify call failing, Restore Purchases can
-    // recover it later using this same productId → contentId pairing.
-    Alert.alert("Purchase Failed", err?.response?.data?.message || err?.message || "Could not complete purchase. If you were charged, use \"Restore Purchases\" to recover access.");
-    return { success: false };
-  }
+
+    const errorSub = RNIap!.purchaseErrorListener((error: any) => {
+      if (error?.productId && error.productId !== productId) return;
+      if (error?.code === "E_USER_CANCELLED") {
+        settle({ success: false, cancelled: true });
+      } else {
+        settle({ success: false, errorMessage: error?.message || "Could not complete purchase." });
+      }
+    });
+
+    RNIap!.requestPurchase({ sku: productId }).catch((err: any) => {
+      if (err?.code === "E_USER_CANCELLED") {
+        settle({ success: false, cancelled: true });
+      } else {
+        settle({ success: false, errorMessage: err?.message || "Could not complete purchase." });
+      }
+    });
+  });
 }
 
 /** Android purchase path — unchanged Razorpay flow, just shared across courses/programs. */
@@ -186,12 +229,15 @@ export async function restorePurchases(): Promise<{ restoredCount: number }> {
   const purchases = await RNIap.getAvailablePurchases();
   let restoredCount = 0;
   for (const purchase of purchases) {
-    if (!purchase.transactionReceipt || !purchase.productId) continue;
+    const restoreReceipt = purchase.transactionReceipt
+      || (purchase as any).verificationResultIOS
+      || (purchase as any).jwsRepresentationIos;
+    if (!restoreReceipt || !purchase.productId) continue;
     const pending = await getPending(purchase.productId);
     if (!pending) continue; // already redeemed previously, nothing to recover
     try {
       await client.post("/payments/apple/verify", {
-        transactionReceipt: purchase.transactionReceipt,
+        transactionReceipt: restoreReceipt,
         contentType: pending.contentType,
         contentId: pending.contentId,
       });

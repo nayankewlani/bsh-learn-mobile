@@ -14,6 +14,7 @@ import { showTabBar, hideTabBar } from "../../stores/tabBarStore";
 import { RAZORPAY_KEY_ID, API_URL } from "../../constants";
 import client from "../../api/client";
 import { purchaseCourse, purchaseProgram } from "../../services/purchaseService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useHomeStore } from "../../stores/homeStore";
 
 // react-native-razorpay (EAS build only)
@@ -778,15 +779,28 @@ export default function HomeScreen() {
     }
   }, [homeClasses.length]);
 
-  // User-specific: healing tools access check (re-runs on login/logout)
-  useEffect(() => {
+  // User-specific: healing tools access check. Re-runs on login/logout AND
+  // every time this tab comes back into focus (so a purchase on the program
+  // page is reflected immediately when the user navigates back here).
+  const checkHealingAccess = useCallback(() => {
     if (!user) { setHasHealingAccess(false); return; }
-    InteractionManager.runAfterInteractions(() => {
-      client.get("/payments/program-access/healing-tools")
-        .then(({ data }) => setHasHealingAccess(data.hasAccess === true))
-        .catch(() => {});
-    });
+    // Read local flag first — set immediately after purchase so tools unlock
+    // without waiting for the network round-trip.
+    AsyncStorage.getItem("bsh_healing_unlocked").then(flag => {
+      if (flag === "1") setHasHealingAccess(true);
+    }).catch(() => {});
+    client.get("/payments/program-access/healing-tools")
+      .then(({ data }) => {
+        const hasAccess = data.hasAccess === true;
+        setHasHealingAccess(hasAccess);
+        if (hasAccess) AsyncStorage.setItem("bsh_healing_unlocked", "1").catch(() => {});
+      })
+      .catch(() => {});
   }, [user?._id]);
+
+  useEffect(() => { checkHealingAccess(); }, [checkHealingAccess]);
+
+  useFocusEffect(useCallback(() => { checkHealingAccess(); }, [checkHealingAccess]));
 
 
   useEffect(() => {
@@ -1911,9 +1925,9 @@ export default function HomeScreen() {
                   disabled={purchaseLoading}>
                   {purchaseLoading
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={{color:"#fff",fontSize:15,fontWeight:"900"}}>🔒 Enroll Now — Razorpay</Text>}
+                    : <Text style={{color:"#fff",fontSize:15,fontWeight:"900"}}>🔒 Enroll Now{Platform.OS === "android" ? " — Razorpay" : ""}</Text>}
                 </TouchableOpacity>
-                <Text style={{color:t.textMuted,fontSize:11,textAlign:"center",marginTop:8}}>Secure payment via Razorpay · GHL synced</Text>
+                <Text style={{color:t.textMuted,fontSize:11,textAlign:"center",marginTop:8}}>Secure payment via {Platform.OS === "ios" ? "Apple" : "Razorpay"} · GHL synced</Text>
               </View>
               <TouchableOpacity style={{alignItems:"center",paddingBottom:20}} onPress={()=>setBookModal("freeCall")}>
                 <Text style={{color:t.textMuted,fontSize:13}}>Have questions? <Text style={{color:"#0c2461",fontWeight:"700"}}>📞 Talk to counsellor</Text></Text>
