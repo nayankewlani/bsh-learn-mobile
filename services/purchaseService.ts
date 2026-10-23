@@ -46,6 +46,18 @@ async function ensureIAPReady(): Promise<boolean> {
   try {
     RNIap.setup({ storekitMode: "STOREKIT2_MODE" });
     await RNIap.initConnection();
+    // Finish any transactions that are still in the StoreKit queue but were
+    // already redeemed on our backend (no local pending record = already done).
+    // Without this, StoreKit2 replays them via purchaseUpdatedListener and our
+    // backend rejects them as "already used for different content".
+    try {
+      const stale = await RNIap.getAvailablePurchases();
+      for (const p of stale) {
+        if (!p.productId) continue;
+        const pending = await getPending(p.productId);
+        if (!pending) await RNIap.finishTransaction({ purchase: p }).catch(() => {});
+      }
+    } catch {}
     const products = await RNIap.getProducts({ skus: ALL_IAP_SKUS });
     if (products.length === 0) {
       console.error("[purchaseService] getProducts returned 0 products — store not ready");
@@ -73,6 +85,7 @@ async function purchaseIOS(contentType: ContentType, contentId: string, pricePai
   }
   const productId = nearestTierProductId(pricePaise);
   await setPending(productId, contentType, contentId);
+  const purchaseStartTime = Date.now();
 
   return new Promise<PurchaseResult>((resolve) => {
     let settled = false;
@@ -97,6 +110,16 @@ async function purchaseIOS(contentType: ContentType, contentId: string, pricePai
       if (!receipt) {
         // StoreKit2 fires the listener with a pending/deferred state before the
         // real JWS arrives. Ignore silently — the second callback will have it.
+        return;
+      }
+      // If this transaction predates the current purchase flow by more than 30s,
+      // it's a stale transaction StoreKit2 is replaying from a previous purchase.
+      // Finish it silently — it was already redeemed; don't send to the API.
+      const txDate = purchase.transactionDate
+        ? new Date(purchase.transactionDate).getTime()
+        : null;
+      if (txDate && txDate < purchaseStartTime - 30000) {
+        RNIap!.finishTransaction({ purchase }).catch(() => {});
         return;
       }
       try {
