@@ -238,18 +238,29 @@ function RootLayout() {
           headerStyle: { backgroundColor: COLORS.surface },
           headerTintColor: COLORS.text,
           contentStyle: { backgroundColor: COLORS.bg },
+          headerBackTitle: "Back",
         }}
       >
-        <Stack.Screen name="(tabs)"          options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)"          options={{ headerShown: false }} />
-        <Stack.Screen name="admin"           options={{ headerShown: false }} />
-        <Stack.Screen name="course/[id]"     options={{ title: "Course" }} />
+        <Stack.Screen name="(tabs)"           options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)"           options={{ headerShown: false }} />
+        <Stack.Screen name="admin"            options={{ headerShown: false }} />
+        <Stack.Screen name="course/[id]"      options={{ headerShown: false }} />
         <Stack.Screen name="watch/[lessonId]" options={{ headerShown: false }} />
-        <Stack.Screen name="consultation"    options={{ headerShown: false }} />
-        <Stack.Screen name="educator/[slug]" options={{ headerShown: false }} />
-        <Stack.Screen name="coming-soon"     options={{ headerShown: false }} />
-        <Stack.Screen name="program/[slug]"  options={{ headerShown: false }} />
-        <Stack.Screen name="class-hub/[id]"  options={{ headerShown: false }} />
+        <Stack.Screen name="consultation"     options={{ headerShown: false }} />
+        <Stack.Screen name="educator/[slug]"  options={{ headerShown: false }} />
+        <Stack.Screen name="coming-soon"      options={{ headerShown: false }} />
+        <Stack.Screen name="program/[slug]"   options={{ headerShown: false }} />
+        <Stack.Screen name="class-hub/[id]"   options={{ headerShown: false }} />
+        <Stack.Screen name="module/[id]"      options={{ headerShown: false }} />
+        <Stack.Screen name="healing-tools"    options={{ headerShown: false }} />
+        <Stack.Screen name="horoscope"        options={{ headerShown: false }} />
+        <Stack.Screen name="kundli"           options={{ headerShown: false }} />
+        <Stack.Screen name="numerology"       options={{ headerShown: false }} />
+        <Stack.Screen name="panchang"         options={{ headerShown: false }} />
+        <Stack.Screen name="puja"             options={{ headerShown: false }} />
+        <Stack.Screen name="profile"          options={{ headerShown: false }} />
+        <Stack.Screen name="book-session"     options={{ headerShown: false }} />
+        <Stack.Screen name="mou"              options={{ headerShown: false }} />
       </Stack>
       {showSplash && <AppSplash onDone={handleSplashDone} />}
     </ErrorBoundary>
