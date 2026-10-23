@@ -309,7 +309,7 @@ export default function ProgramDetailScreen() {
           if (prog.programId === "healing-tools") {
             AsyncStorage.setItem("bsh_healing_unlocked", "1").catch(() => {});
             Alert.alert("Unlocked! 🎉", "All 20 Healing Tools are now available.",
-              [{ text: "Open Tools", onPress: () => router.navigate("/(tabs)/" as any) }]);
+              [{ text: "Open Tools", onPress: () => router.navigate("/healing-tools" as any) }]);
           } else {
             Alert.alert("Welcome! 🎉", `You now have full access to ${prog.title}.`,
               [{ text: "Start Learning", onPress: () => router.navigate("/(tabs)/explore" as any) }]);
@@ -365,7 +365,7 @@ export default function ProgramDetailScreen() {
       if (prog.programId === "healing-tools") {
         AsyncStorage.setItem("bsh_healing_unlocked", "1").catch(() => {});
         Alert.alert("Unlocked! 🎉", "All 20 Healing Tools are now available.",
-          [{ text: "Open Tools", onPress: () => router.navigate("/(tabs)/" as any) }]);
+          [{ text: "Open Tools", onPress: () => router.navigate("/healing-tools" as any) }]);
       } else {
         Alert.alert("Welcome! 🎉", `You now have full access to ${prog.title}.`,
           [{ text: "Start Learning", onPress: () => router.navigate("/(tabs)/explore" as any) }]);
@@ -448,7 +448,7 @@ export default function ProgramDetailScreen() {
           </View>
 
           {/* Open tools CTA */}
-          <TouchableOpacity style={ht.goBtn} onPress={() => router.navigate("/(tabs)/" as any)}>
+          <TouchableOpacity style={ht.goBtn} onPress={() => router.navigate("/healing-tools" as any)}>
             <Text style={ht.goBtnTxt}>Open Healing Tools →</Text>
           </TouchableOpacity>
 
