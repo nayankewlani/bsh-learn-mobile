@@ -2,7 +2,7 @@
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  TextInput, ActivityIndicator, Alert, Platform, Linking,
+  TextInput, ActivityIndicator, Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -11,7 +11,6 @@ import { useAuthStore } from "../stores/authStore";
 import { useThemeStore } from "../stores/themeStore";
 import { RAZORPAY_KEY_ID } from "../constants";
 import client from "../api/client";
-import { purchaseConsultation } from "../services/purchaseService";
 
 const _rzpMod = (() => { try { return require("react-native-razorpay"); } catch { return null; } })();
 const RazorpayCheckout: {
@@ -55,46 +54,30 @@ export default function BookSessionScreen() {
     if (!user) { router.push("/(auth)/login"); return; }
     setError(""); setPaying(true);
     try {
-      if (Platform.OS === "ios") {
-        const result = await purchaseConsultation({
-          trainerId:    params.expertId,
-          trainerName:  params.expertName,
-          sessions,
-          durationMins: duration,
-          bonusSessions,
-          totalPaise,
-          ratePerMin,
-          clientNote,
-          preferredTime,
-          userName:  user.name,
-          userEmail: user.email,
-        });
-        if (result.success) setBooked(true);
-      } else {
-        // Android: native Razorpay SDK flow — stays in-app and returns payment IDs synchronously.
-        if (!RazorpayCheckout) {
-          Alert.alert("Payment Not Available", "Payments require the full BSH app build (not Expo Go)."); return;
-        }
-        const { data } = await client.post("/consultation-bookings/create-order", {
-          trainerName: params.expertName, trainerId: params.expertId,
-          sessions, durationMins: duration, bonusSessions, totalPaise,
-          clientNote, preferredTime,
-        });
-        const paymentData = await RazorpayCheckout.open({
-          key: RAZORPAY_KEY_ID, amount: String(data.order.amount), currency: "INR",
-          name: "BSH Healers",
-          description: `${sessions} session${sessions > 1 ? "s" : ""} with ${params.expertName}`,
-          order_id: data.order.id,
-          prefill: { name: user.name, email: user.email },
-          theme: { color: expertColor },
-        });
-        await client.post("/consultation-bookings/verify", {
-          razorpayOrderId: paymentData.razorpay_order_id,
-          razorpayPaymentId: paymentData.razorpay_payment_id,
-          razorpaySignature: paymentData.razorpay_signature,
-        });
-        setBooked(true);
+      // Consultations are human-rendered services — exempt from Apple IAP.
+      // Use Razorpay on both iOS and Android.
+      if (!RazorpayCheckout) {
+        Alert.alert("Payment Not Available", "Payments require the full BSH app build (not Expo Go)."); return;
       }
+      const { data } = await client.post("/consultation-bookings/create-order", {
+        trainerName: params.expertName, trainerId: params.expertId,
+        sessions, durationMins: duration, bonusSessions, totalPaise,
+        clientNote, preferredTime,
+      });
+      const paymentData = await RazorpayCheckout.open({
+        key: RAZORPAY_KEY_ID, amount: String(data.order.amount), currency: "INR",
+        name: "BSH Healers",
+        description: `${sessions} session${sessions > 1 ? "s" : ""} with ${params.expertName}`,
+        order_id: data.order.id,
+        prefill: { name: user.name, email: user.email },
+        theme: { color: expertColor },
+      });
+      await client.post("/consultation-bookings/verify", {
+        razorpayOrderId: paymentData.razorpay_order_id,
+        razorpayPaymentId: paymentData.razorpay_payment_id,
+        razorpaySignature: paymentData.razorpay_signature,
+      });
+      setBooked(true);
     } catch (err: unknown) {
       const e = err as { code?: number; description?: string; response?: { data?: { message?: string } }; message?: string };
       if (e?.code === 0) { setPaying(false); return; }
