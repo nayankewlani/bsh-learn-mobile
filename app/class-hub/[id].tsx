@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Animated,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,6 +26,7 @@ interface ProgramInfo {
   thumbnail: string;
   enrolledAt: string;
   expiresAt: string | null;
+  ghlPortalUrl?: string | null;
 }
 
 interface LiveClass {
@@ -36,6 +38,19 @@ interface LiveClass {
   status: "live" | "scheduled" | "ended" | "pending_approval" | "rejected";
   maxParticipants?: number;
   recordingGcsKey?: string;
+}
+
+interface MediaItem {
+  _id: string;
+  title: string;
+  description?: string;
+  type: "video" | "pdf" | "image";
+  muxPlaybackId?: string;
+  muxStatus: string;
+  gcsKey?: string;
+  fileName?: string;
+  tags: string[];
+  isFree: boolean;
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -87,6 +102,17 @@ export default function ClassHubScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error,      setError]      = useState("");
+
+  // Tab
+  const [activeTab, setActiveTab] = useState<"classes" | "content">("classes");
+
+  // Content
+  const [contentItems,    setContentItems]    = useState<MediaItem[]>([]);
+  const [contentLoading,  setContentLoading]  = useState(false);
+  const [contentFetched,  setContentFetched]  = useState(false);
+
+  // GHL portal link
+  const [ghlLoading, setGhlLoading] = useState(false);
 
   // Calendar state
   const [selectedDate, setSelectedDate] = useState<Date>(TODAY);
@@ -152,6 +178,45 @@ export default function ClassHubScreen() {
   useEffect(() => { loadAll(selectedDate); }, []);
 
   const onRefresh = () => { setRefreshing(true); loadAll(selectedDate, true); };
+
+  const loadContent = useCallback(async () => {
+    if (!id) return;
+    setContentLoading(true);
+    try {
+      const { data } = await client.get(`/media/for-me?target=program&programId=${id}`);
+      setContentItems(data.items || []);
+      setContentFetched(true);
+    } catch {
+      setContentFetched(true);
+    } finally {
+      setContentLoading(false);
+    }
+  }, [id]);
+
+  const openGHLContent = async () => {
+    setGhlLoading(true);
+    try {
+      const { data } = await client.get(`/payments/ghl-content-link/${id}`);
+      if (data.url) await Linking.openURL(data.url);
+    } catch {
+      // fall back to direct portal URL if API fails
+      if (program?.ghlPortalUrl) await Linking.openURL(program.ghlPortalUrl).catch(() => {});
+    } finally {
+      setGhlLoading(false);
+    }
+  };
+
+  const openContentItem = async (item: MediaItem) => {
+    if (item.type === "video" && item.muxPlaybackId) {
+      router.push({ pathname: "/watch/[lessonId]" as any, params: { lessonId: item._id, source: "media" } });
+      return;
+    }
+    // PDF / Image — get a fresh signed URL then open in browser
+    try {
+      const { data } = await client.get(`/media/${item._id}/stream`);
+      if (data.streamUrl) await Linking.openURL(data.streamUrl);
+    } catch {}
+  };
 
   // When user taps a calendar day
   const selectDay = (date: Date) => {
@@ -237,7 +302,76 @@ export default function ClassHubScreen() {
         </View>
       </View>
 
-      {/* ── Calendar ── */}
+      {/* ── Tab bar ── */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity style={[styles.tabBtn, activeTab === "classes" && styles.tabBtnActive]} onPress={() => setActiveTab("classes")}>
+          <Text style={[styles.tabBtnText, activeTab === "classes" && styles.tabBtnTextActive]}>📅 Classes</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "content" && styles.tabBtnActive]}
+          onPress={() => { setActiveTab("content"); if (!contentFetched) loadContent(); }}
+        >
+          <Text style={[styles.tabBtnText, activeTab === "content" && styles.tabBtnTextActive]}>📚 Content</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Content tab ── */}
+      {activeTab === "content" && (
+        <View style={{ marginHorizontal: 16 }}>
+          {/* GHL-backed program: single button that deep-links into GHL portal */}
+          {program?.ghlPortalUrl ? (
+            <View style={styles.ghlCard}>
+              <Text style={{ fontSize: 40, marginBottom: 16 }}>🎓</Text>
+              <Text style={styles.ghlTitle}>Course Content on BSH Portal</Text>
+              <Text style={styles.ghlMeta}>
+                Your videos, recordings and resources for{"\n"}
+                <Text style={{ fontWeight: "800", color: COLORS.text }}>{program.title}</Text>
+                {"\n"}are hosted on our learning portal.
+              </Text>
+              <TouchableOpacity
+                style={[styles.ghlBtn, ghlLoading && { opacity: 0.6 }]}
+                onPress={openGHLContent}
+                activeOpacity={0.8}
+                disabled={ghlLoading}
+              >
+                {ghlLoading
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.ghlBtnText}>▶  Watch Course Content</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          ) : contentLoading ? (
+            <View style={styles.center}><ActivityIndicator color={COLORS.primaryLight} size="large" /></View>
+          ) : contentItems.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={{ fontSize: 48, marginBottom: 14 }}>📭</Text>
+              <Text style={styles.emptyTitle}>No Content Yet</Text>
+              <Text style={styles.emptyMeta}>Videos, PDFs and resources will appear here once uploaded.</Text>
+            </View>
+          ) : (
+            contentItems.map(item => (
+              <TouchableOpacity key={item._id} style={styles.contentCard} onPress={() => openContentItem(item)} activeOpacity={0.75}>
+                <Text style={styles.contentIcon}>{item.type === "video" ? "🎬" : item.type === "pdf" ? "📄" : "🖼️"}</Text>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.contentTitle} numberOfLines={2}>{item.title}</Text>
+                  {item.description ? <Text style={styles.contentDesc} numberOfLines={1}>{item.description}</Text> : null}
+                  {item.tags.length > 0 && (
+                    <View style={styles.tagRow}>
+                      {item.tags.slice(0, 3).map(tag => (
+                        <View key={tag} style={styles.tag}><Text style={styles.tagText}>{tag}</Text></View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <Text style={{ color: COLORS.primaryLight, fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      )}
+
+      {/* ── Classes tab ── */}
+      {activeTab === "classes" && (<>
       <View style={styles.calendarCard}>
         {/* Month nav header */}
         <View style={styles.calHeader}>
@@ -400,6 +534,8 @@ export default function ClassHubScreen() {
           )}
         </>
       )}
+      </>)}
+
     </ScrollView>
   );
 }
@@ -487,4 +623,27 @@ const styles = StyleSheet.create({
   emptyMeta:  { fontSize: 13, color: COLORS.textMuted, textAlign: "center", lineHeight: 20 },
 
   errorText: { color: COLORS.red, textAlign: "center", margin: 24, fontSize: 13 },
+
+  // Tab bar
+  tabBar:            { flexDirection: "row", marginHorizontal: 16, marginBottom: 16, backgroundColor: COLORS.surface, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: COLORS.border },
+  tabBtn:            { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 9 },
+  tabBtnActive:      { backgroundColor: COLORS.primary },
+  tabBtnText:        { fontSize: 13, fontWeight: "700", color: COLORS.textMuted },
+  tabBtnTextActive:  { color: "#fff" },
+
+  // GHL portal card
+  ghlCard:    { alignItems: "center", backgroundColor: COLORS.surface, borderRadius: 16, padding: 28, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
+  ghlTitle:   { fontSize: 17, fontWeight: "800", color: COLORS.text, marginBottom: 10, textAlign: "center" },
+  ghlMeta:    { fontSize: 13, color: COLORS.textMuted, textAlign: "center", lineHeight: 20, marginBottom: 24 },
+  ghlBtn:     { backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14, minWidth: 200, alignItems: "center" },
+  ghlBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+
+  // Content cards
+  contentCard:  { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
+  contentIcon:  { fontSize: 28, marginRight: 14 },
+  contentTitle: { fontSize: 13, fontWeight: "700", color: COLORS.text, marginBottom: 3, lineHeight: 18 },
+  contentDesc:  { fontSize: 11, color: COLORS.textMuted, lineHeight: 16 },
+  tagRow:       { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 5 },
+  tag:          { backgroundColor: "rgba(96,165,250,0.1)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  tagText:      { fontSize: 10, color: COLORS.primaryLight, fontWeight: "600" },
 });
