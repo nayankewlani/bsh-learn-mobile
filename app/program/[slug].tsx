@@ -224,6 +224,8 @@ export default function ProgramDetailScreen() {
   const [mediaItems,   setMediaItems]   = useState<MediaItem[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaFetched, setMediaFetched] = useState(false);
+  const [ghlPortalUrl, setGhlPortalUrl] = useState<string | null>(null);
+  const [ghlLoading,   setGhlLoading]   = useState(false);
 
   const prog = PROGRAMS[slug ?? ""] ?? PROGRAMS["advance-hypnosis"];
 
@@ -250,6 +252,7 @@ export default function ProgramDetailScreen() {
       .then(({ data }) => {
         const found = (data.programs ?? []).find((p: any) => p.programId === prog.programId);
         if (found?.razorpayPaymentLink) setApiRzpLink(found.razorpayPaymentLink);
+        if (found?.ghlPortalUrl) setGhlPortalUrl(found.ghlPortalUrl);
       })
       .catch(() => {});
   }, [prog.programId]);
@@ -274,6 +277,18 @@ export default function ProgramDetailScreen() {
       const { data } = await client.get(`/media/${item._id}/stream`);
       if (data.streamUrl) Linking.openURL(data.streamUrl);
     } catch {}
+  };
+
+  const openGHLContent = async () => {
+    setGhlLoading(true);
+    try {
+      const { data } = await client.get(`/payments/ghl-content-link/${prog.programId}`);
+      if (data.url) await Linking.openURL(data.url);
+    } catch {
+      if (ghlPortalUrl) await Linking.openURL(ghlPortalUrl).catch(() => {});
+    } finally {
+      setGhlLoading(false);
+    }
   };
 
   const handleJoin = async (planId?: string) => {
@@ -555,9 +570,26 @@ export default function ProgramDetailScreen() {
             })}
           </ScrollView>
 
-          {/* Content tab — 2-column portrait grid */}
+          {/* Content tab — GHL portal button (if configured) + BSH media grid */}
           {filter === "content" && (
-            mediaLoading ? (
+            ghlPortalUrl ? (
+              <TouchableOpacity
+                style={[s.ghlBtn, ghlLoading && { opacity: 0.6 }]}
+                onPress={openGHLContent}
+                activeOpacity={0.85}
+                disabled={ghlLoading}
+              >
+                {ghlLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="play-circle" size={22} color="#fff" style={{ marginRight: 10 }} />
+                    <Text style={s.ghlBtnTxt}>Watch Course Content</Text>
+                    <Ionicons name="open-outline" size={16} color="rgba(255,255,255,0.7)" style={{ marginLeft: 8 }} />
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : mediaLoading ? (
               <ActivityIndicator color={accent} size="large" style={{ marginTop: 40 }} />
             ) : mediaItems.length === 0 ? (
               <View style={s.emptyState}>
@@ -1144,6 +1176,8 @@ const s = StyleSheet.create({
   emptyState: { paddingVertical: 52, alignItems: "center" },
   emptyTitle: { color: "#f1f5f9", fontSize: 16, fontWeight: "700", marginBottom: 6 },
   emptySub: { color: "#64748b", fontSize: 13 },
+  ghlBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#0c2461", borderRadius: 14, paddingVertical: 18, paddingHorizontal: 24, marginTop: 8, marginBottom: 8 },
+  ghlBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "800" },
   postCard: {
     backgroundColor: "#0f0a2e", borderRadius: 14, padding: 16,
     marginBottom: 12, borderWidth: 1, borderColor: "#0f2557",
