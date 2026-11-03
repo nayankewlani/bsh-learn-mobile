@@ -35,7 +35,8 @@ function stripHtml(html: string): string {
 export default function MouScreen() {
   const insets     = useSafeAreaInsets();
   const { user }   = useAuthStore();
-  const { colors } = useThemeStore();
+  const { t } = useThemeStore();
+  const colors = { ...t, background: t.bg, primary: t.accent, textSecondary: t.textSec };
 
   const [loading, setLoading]       = useState(true);
   const [mou, setMou]               = useState<any>(null);
