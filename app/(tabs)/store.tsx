@@ -54,13 +54,13 @@ const PRODUCTS = [
     slug: "",
   },
   {
-    id: "p4", category: "Courses", isActive: false,
+    id: "p4", category: "Courses", isActive: true,
     title: "Reiki Level 1 & 2",
     desc: "Universal life energy healing — beginner to practitioner.",
     img: reikiImg, price: 1999, originalPrice: 3000,
     badge: "NEW", badgeColor: "#059669",
     tag: "Workshop",
-    slug: "",
+    slug: "reiki-level-1-2",
   },
   {
     id: "p5", category: "Courses", isActive: true,
