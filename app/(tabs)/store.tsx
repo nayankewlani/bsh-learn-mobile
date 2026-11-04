@@ -99,13 +99,13 @@ const PRODUCTS = [
     slug: "",
   },
   {
-    id: "p9", category: "Tools", isActive: false,
-    title: "BSH Plus Membership",
-    desc: "Access all 20 healing tools, guided meditations & live sessions.",
-    img: bshLogoImg, price: 999, originalPrice: 1999,
-    badge: "MONTHLY", badgeColor: "#0c2461",
-    tag: "Subscription",
-    slug: "",
+    id: "p9", category: "Tools", isActive: true,
+    title: "BSH Healing Tools — Full Access",
+    desc: "Unlock all 16 premium healing tools: sleep hypnosis, chakra balancing & more. Lifetime access.",
+    img: bshLogoImg, price: 99, originalPrice: 199,
+    badge: "LIFETIME", badgeColor: "#d97706",
+    tag: "Tool Pack",
+    slug: "healing-tools",
   },
 ];
 

@@ -1983,9 +1983,9 @@ export default function HomeScreen() {
                   disabled={purchaseLoading}>
                   {purchaseLoading
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={{color:"#fff",fontSize:15,fontWeight:"900"}}>🔒 Enroll Now — Razorpay</Text>}
+                    : <Text style={{color:"#fff",fontSize:15,fontWeight:"900"}}>🔒 Enroll Now{Platform.OS === "android" ? " — Razorpay" : ""}</Text>}
                 </TouchableOpacity>
-                <Text style={{color:t.textMuted,fontSize:11,textAlign:"center",marginTop:8}}>Secure payment · Agora live · Mux recordings</Text>
+                <Text style={{color:t.textMuted,fontSize:11,textAlign:"center",marginTop:8}}>Secure payment via {Platform.OS === "ios" ? "Apple" : "Razorpay"} · Agora live · Mux recordings</Text>
               </View>
               <View style={{flexDirection:"row",gap:12,marginBottom:16}}>
                 {[{icon:"📺",label:"Live classes via Agora"},{icon:"🎥",label:"Recordings on Mux"},{icon:"✅",label:"Certificate on completion"}].map(f=>(
