@@ -430,7 +430,9 @@ const HeroCarousel = React.memo(({ heroSlides, isTabFocused, isHeroVisible, data
             // ── Banner slide ──────────────────────────────────────────────────
             if (isBanner) {
               const b = item as HeroBannerItem;
-              const dest = b.ctaLink || ("/(tabs)/live" as any);
+              // Normalise legacy "Live page" text to the actual route
+              const rawDest = b.ctaLink || "/(tabs)/live";
+              const dest = rawDest.toLowerCase().includes("live page") ? "/(tabs)/live" : rawDest;
               return (
                 <TouchableOpacity activeOpacity={0.95} style={{ width: SW, height: SW * 1.1 + insets.top }}
                   onPress={() => router.push(dest as any)}>
