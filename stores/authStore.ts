@@ -8,10 +8,13 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  city?: string;
+  profession?: string;
   role: "student" | "educator" | "admin";
   avatar?: string;
   bio?: string;
   dob?: string;
+  streakCount?: number;
 }
 
 interface AuthState {
@@ -35,9 +38,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const token = await SecureStore.getItemAsync("accessToken");
       if (!token) return;
+      set({ isLoading: true });
       const { data } = await client.get("/auth/me");
-      set({ user: data.user });
-    } catch {}
+      set({ user: data.user, isLoading: false });
+    } catch {
+      set({ isLoading: false });
+    }
   },
 
   login: async (email, password) => {

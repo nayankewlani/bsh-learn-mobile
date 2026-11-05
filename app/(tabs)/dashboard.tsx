@@ -9,10 +9,12 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { useCourseStore } from "../../stores/courseStore";
 import { COLORS } from "../../constants";
@@ -48,16 +50,19 @@ const BENEFITS: { icon: IoniconName; text: string }[] = [
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuthStore();
-  const { enrolledCourses, fetchMyCourses } = useCourseStore();
+  const { user, logout, loadUser, isLoading } = useAuthStore();
+  const { enrolledCourses, programs, fetchMyCourses, fetchMyPrograms } = useCourseStore();
 
   const HEADER_H = 90 + insets.top;
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollYRef = useRef(0);
   const headerHiddenRef = useRef(false);
 
+  // Reload user every time dashboard tab comes into focus so role is always fresh
+  useFocusEffect(useCallback(() => { loadUser(); }, []));
+
   useEffect(() => {
-    if (user) fetchMyCourses();
+    if (user) { fetchMyCourses(); fetchMyPrograms(); }
   }, [user]);
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -79,6 +84,15 @@ export default function DashboardScreen() {
       Animated.timing(headerTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     }
   }, []);
+
+  /* ─── Loading state (cold start before user resolves) ─── */
+  if (!user && isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0d0820" }}>
+        <ActivityIndicator size="large" color="#FF6B8A" />
+      </View>
+    );
+  }
 
   /* ─── Guest View ─── */
   if (!user) {
@@ -132,7 +146,10 @@ export default function DashboardScreen() {
   /* ─── Authenticated View ─── */
   const inProgress = useMemo(() => enrolledCourses.filter((e) => e.progress < 100), [enrolledCourses]);
   const completed  = useMemo(() => enrolledCourses.filter((e) => e.progress === 100), [enrolledCourses]);
-  const streak     = 7;
+  const streak     = user?.streakCount ?? 0;
+  const totalEnrolled   = enrolledCourses.length + programs.length;
+  const totalInProgress = inProgress.length + programs.length;
+  const totalCompleted  = completed.length;
   const initials   = useMemo(() => user.name
     .split(" ")
     .map((n: string) => n[0])
@@ -211,10 +228,10 @@ export default function DashboardScreen() {
         {/* Stats strip */}
         <View style={styles.statsStrip}>
           {[
-            { icon: "library-outline"         as IoniconName, val: enrolledCourses.length, label: "Enrolled",    color: "#FF6B8A" },
-            { icon: "hourglass-outline"        as IoniconName, val: inProgress.length,      label: "In Progress", color: "#f59e0b" },
-            { icon: "checkmark-circle-outline" as IoniconName, val: completed.length,        label: "Completed",   color: "#4ade80" },
-            { icon: "flame"                    as IoniconName, val: streak,                  label: "Day Streak",  color: "#ef4444" },
+            { icon: "library-outline"         as IoniconName, val: totalEnrolled,   label: "Enrolled",    color: "#FF6B8A" },
+            { icon: "hourglass-outline"        as IoniconName, val: totalInProgress, label: "In Progress", color: "#f59e0b" },
+            { icon: "checkmark-circle-outline" as IoniconName, val: totalCompleted,  label: "Completed",   color: "#4ade80" },
+            { icon: "flame"                    as IoniconName, val: streak,          label: "Day Streak",  color: "#ef4444" },
           ].map((s, i) => (
             <View key={s.label} style={[styles.statBox, i < 3 && { marginRight: 8 }]}>
               <Ionicons name={s.icon} size={16} color={s.color} />
