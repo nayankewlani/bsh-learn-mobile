@@ -106,6 +106,19 @@ function RootLayout() {
       } catch { /* ignore network errors */ }
     })();
 
+    // Set up Android notification channel with HIGH importance so images display.
+    if (Platform.OS === "android") {
+      import("expo-notifications").then(async (Notifications) => {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "BSH Notifications",
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#7c3aed",
+          showBadge: true,
+        });
+      }).catch(() => {});
+    }
+
     // Request notification permission and register this device immediately on launch.
     import("../services/notificationService").then(async (mod) => {
       await mod.requestNotificationPermission();
