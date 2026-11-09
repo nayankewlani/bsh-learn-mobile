@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
   View, Text, TouchableOpacity, StyleSheet,
@@ -40,15 +40,33 @@ export default function BookSessionScreen() {
   const [paying, setPaying]             = useState(false);
   const [error, setError]               = useState("");
   const [booked, setBooked]             = useState(false);
+  const [discount, setDiscount]         = useState<{ discountType: string; discountValue: number; note?: string } | null>(null);
+
+  useEffect(() => {
+    if (!params.expertId || !user) return;
+    client.get(`/consultation-bookings/check-discount?trainerId=${params.expertId}`)
+      .then(r => setDiscount(r.data.discount ?? null))
+      .catch(() => {});
+  }, [params.expertId, user]);
 
   const bonusSessions         = sessions >= 5 ? Math.floor(sessions / 5) : 0;
   const effectiveSessions     = sessions + bonusSessions;
   const totalMins             = effectiveSessions * duration;
   const ratePerMin            = usePerSession ? dbSessionPricePaise / 100 : FALLBACK_RATE;
   const pricePerSessionRupees = ratePerMin * duration;
-  const totalRupees           = sessions * pricePerSessionRupees;
-  const totalPaise            = Math.round(totalRupees * 100);
+  const baseTotalRupees       = sessions * pricePerSessionRupees;
+  const baseTotalPaise        = Math.round(baseTotalRupees * 100);
   const savedRupees           = bonusSessions * pricePerSessionRupees;
+
+  const discountedPaise = (() => {
+    if (!discount) return baseTotalPaise;
+    if (discount.discountType === "percent")
+      return Math.max(100, Math.round(baseTotalPaise * (1 - discount.discountValue / 100)));
+    return Math.max(100, baseTotalPaise - discount.discountValue);
+  })();
+  const totalRupees         = discountedPaise / 100;
+  const totalPaise          = discountedPaise;
+  const discountSavingRupees = (baseTotalPaise - discountedPaise) / 100;
 
   const handlePay = async () => {
     if (!user) { router.push("/(auth)/login"); return; }
@@ -196,17 +214,43 @@ export default function BookSessionScreen() {
             style={[s.input, s.textarea, { color:t.text, borderColor:t.border, backgroundColor:t.surface }]} />
         </View>
 
+        {/* Discount banner */}
+        {!!discount && (
+          <View style={[s.discountBanner]}>
+            <Text style={{ fontSize:20 }}>🏷️</Text>
+            <View style={{ marginLeft:10, flex:1 }}>
+              <Text style={{ color:"#16a34a", fontWeight:"800", fontSize:14 }}>
+                Special Discount Applied!{" "}
+                {discount.discountType === "percent"
+                  ? `${discount.discountValue}% off`
+                  : `₹${(discount.discountValue / 100).toLocaleString("en-IN")} off`}
+              </Text>
+              {!!discount.note && <Text style={{ color:"#15803d", fontSize:12, marginTop:2 }}>{discount.note}</Text>}
+            </View>
+          </View>
+        )}
+
         {/* Order summary */}
         <View style={[s.card, { backgroundColor:t.card, borderColor:t.border }]}>
           <Text style={[s.cardLabel, { color:t.text, marginBottom:14 }]}>Order Summary</Text>
           <View style={s.summaryRow}>
             <Text style={{ color:t.textMuted, fontSize:13, flex:1 }}>{sessions} session{sessions > 1 ? "s" : ""} × {duration} min × ₹{ratePerMin.toLocaleString("en-IN")}/min</Text>
-            <Text style={{ color:t.text, fontWeight:"700", fontSize:13 }}>₹{totalRupees.toLocaleString("en-IN")}</Text>
+            <Text style={{ color:discount ? t.textMuted : t.text, fontWeight:"700", fontSize:13, textDecorationLine: discount ? "line-through" : "none" }}>
+              ₹{baseTotalRupees.toLocaleString("en-IN")}
+            </Text>
           </View>
           {bonusSessions > 0 && (
             <View style={s.summaryRow}>
               <Text style={{ color:"#16a34a", fontSize:13, flex:1 }}>🎁 {bonusSessions} free session{bonusSessions > 1 ? "s" : ""} included</Text>
               <Text style={{ color:"#16a34a", fontWeight:"700", fontSize:13 }}>₹0</Text>
+            </View>
+          )}
+          {!!discount && discountSavingRupees > 0 && (
+            <View style={s.summaryRow}>
+              <Text style={{ color:"#16a34a", fontSize:13, flex:1 }}>
+                🏷️ Discount ({discount.discountType === "percent" ? `${discount.discountValue}%` : `₹${(discount.discountValue / 100).toLocaleString("en-IN")}`})
+              </Text>
+              <Text style={{ color:"#16a34a", fontWeight:"700", fontSize:13 }}>−₹{discountSavingRupees.toLocaleString("en-IN")}</Text>
             </View>
           )}
           <View style={s.summaryRow}>
@@ -251,7 +295,8 @@ const s = StyleSheet.create({
   errTxt:      { color:"#f87171", fontSize:13, marginBottom:16, backgroundColor:"rgba(239,68,68,0.08)", padding:10, borderRadius:8, textAlign:"center" },
   payBtn:      { borderRadius:14, paddingVertical:16, alignItems:"center", justifyContent:"center", marginTop:8 },
   payBtnTxt:   { color:"#fff", fontWeight:"800", fontSize:17 },
-  doneCard:    { borderRadius:20, borderWidth:1, padding:32, maxWidth:420, width:"100%" },
-  doneTitle:   { fontSize:22, fontWeight:"900", marginBottom:12, textAlign:"center" },
-  doneTxt:     { fontSize:14, lineHeight:21, marginBottom:8, textAlign:"center" },
+  doneCard:      { borderRadius:20, borderWidth:1, padding:32, maxWidth:420, width:"100%" },
+  doneTitle:     { fontSize:22, fontWeight:"900", marginBottom:12, textAlign:"center" },
+  doneTxt:       { fontSize:14, lineHeight:21, marginBottom:8, textAlign:"center" },
+  discountBanner:{ flexDirection:"row", alignItems:"center", backgroundColor:"rgba(22,163,74,0.08)", borderWidth:1.5, borderColor:"rgba(22,163,74,0.3)", borderRadius:12, padding:14, marginBottom:14 },
 });
