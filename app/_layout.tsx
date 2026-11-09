@@ -109,7 +109,7 @@ function RootLayout() {
     // Set up Android notification channel with HIGH importance so images display.
     if (Platform.OS === "android") {
       import("expo-notifications").then(async (Notifications) => {
-        await Notifications.setNotificationChannelAsync("default", {
+        await Notifications.setNotificationChannelAsync("bsh_high", {
           name: "BSH Notifications",
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
