@@ -14,6 +14,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// Gets the native FCM device token (Android only) — separate from the Expo push token.
+// FCM token is needed for direct FCM V1 sends which support notification.image.
+async function getNativeFCMToken(): Promise<string | null> {
+  try {
+    if (Platform.OS !== "android") return null;
+    const deviceToken = await Notifications.getDevicePushTokenAsync();
+    // expo-notifications 0.32+ returns type "android" (older versions used "firebase")
+    if (deviceToken.type === "android" || deviceToken.type === "firebase") return deviceToken.data as string;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Called on app launch (before login) ──────────────────────────────────────
 // Shows the OS permission dialog on first open. If previously denied and
 // the OS won't prompt again, shows an alert directing the user to Settings.
@@ -52,31 +66,29 @@ export async function requestNotificationPermission(): Promise<void> {
   }
 }
 
-// ── Called after login (user is authenticated) ────────────────────────────────
-// Gets Expo push token and saves it to the server. Permission must already
-// be granted (via requestNotificationPermission called at launch).
-// Called on app launch — no login required.
+// ── Called on app launch (before login) ──────────────────────────────────────
 // Registers this device so it receives "all users" broadcasts even without an account.
 export async function registerDeviceToken(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted") return;
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: EXPO_PROJECT_ID });
-    // Public endpoint — no auth header needed
-    await client.post("/auth/register-device", { token: tokenData.data });
+    const fcmToken = await getNativeFCMToken();
+    await client.post("/auth/register-device", { token: tokenData.data, ...(fcmToken ? { fcmToken } : {}) });
   } catch {
     // Non-critical — silent fail (simulator / no Play Services)
   }
 }
 
-// Called after login — links the device token to the user account.
+// ── Called after login — links the device token to the user account ───────────
 // Enables targeted broadcasts (students, specific course, etc.).
 export async function registerPushToken(): Promise<void> {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted") return;
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: EXPO_PROJECT_ID });
-    await client.post("/auth/push-token", { token: tokenData.data });
+    const fcmToken = await getNativeFCMToken();
+    await client.post("/auth/push-token", { token: tokenData.data, ...(fcmToken ? { fcmToken } : {}) });
   } catch {
     // Non-critical — silent fail
   }
